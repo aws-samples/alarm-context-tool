@@ -1,0 +1,74 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: A Lambda function to add context to CloudWatch Alarms
+Resources:
+  DependenciesLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      ContentUri: dependencies_layer/
+      CompatibleRuntimes:
+        - python3.12
+    Metadata:
+      BuildMethod: python3.12
+  AlarmContextFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: alarm_context/
+      Description: >-
+        A Lambda function to add context to CloudWatch Alarms
+      MemorySize: 1024
+      Timeout: 900
+      Handler: lambda_function.alarm_handler
+      Runtime: python3.12
+      Architectures:
+        - x86_64
+      EphemeralStorage:
+        Size: 512
+      Environment:
+        Variables:
+          AWS_LAMBDA_LOG_LEVEL: DEBUG
+          BEDROCK_MODEL_ID: anthropic.claude-instant-v1
+          POWERTOOLS_LOG_LEVEL: DEBUG
+          POWERTOOLS_SERVICE_NAME: Alarm
+          RECIPIENT: aliving@amazon.com
+          SENDER: Alex Livingstone <aliving@amazon.com>
+          USE_BEDROCK: 'True'
+      EventInvokeConfig:
+        MaximumEventAgeInSeconds: 21600
+        MaximumRetryAttempts: 2
+      Layers:
+        - arn:aws:lambda:us-east-2:580247275435:layer:LambdaInsightsExtension:45
+        - arn:aws:lambda:us-east-2:017000801446:layer:AWSLambdaPowertoolsPythonV2:58
+        - !Ref DependenciesLayer
+      PackageType: Zip
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - ec2:DescribeInstances
+                - sns:GetTopicAttributes
+                - synthetics:DescribeCanariesLastRun
+                - synthetics:DescribeCanaries
+                - synthetics:GetCanaryRuns
+                - logs:DescribeLogGroups
+                - logs:DescribeLogStreams
+                - lambda:GetFunction
+                - ses:SendRawEmail
+                - ecs:DescribeClusters
+                - ssm:DescribeInstanceInformation
+                - dynamodb:DescribeTable
+                - autoscaling:DescribeAutoScalingGroups
+                - logs:GetLogEvents
+                - logs:FilterLogEvents
+                - ecs:DescribeServices
+                - logs:FilterLogEvents
+                - cloudwatch:GetMetricWidgetImage
+                - cloudwatch:GetMetricData
+                - xray:GetTraceSummaries
+                - xray:BatchGetTraces
+              Resource: '*'
+            - Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+              Resource: arn:*:bedrock:*::foundation-model/*     
+      Tracing: Active
