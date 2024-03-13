@@ -1,4 +1,4 @@
-AWSTemplateFormatVersion: '2010-09-09'
+AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
 Description: A Lambda function to add context to CloudWatch Alarms
 Resources:
@@ -10,6 +10,7 @@ Resources:
         - python3.12
     Metadata:
       BuildMethod: python3.12
+
   AlarmContextFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -32,13 +33,13 @@ Resources:
           POWERTOOLS_SERVICE_NAME: Alarm
           RECIPIENT: aliving@amazon.com
           SENDER: Alex Livingstone <aliving@amazon.com>
-          USE_BEDROCK: 'True'
+          USE_BEDROCK: "True"
       EventInvokeConfig:
         MaximumEventAgeInSeconds: 21600
         MaximumRetryAttempts: 2
       Layers:
-        - arn:aws:lambda:us-east-2:580247275435:layer:LambdaInsightsExtension:45
-        - arn:aws:lambda:us-east-2:017000801446:layer:AWSLambdaPowertoolsPythonV2:58
+        - arn:aws:lambda:us-east-2:580247275435:layer:LambdaInsightsExtension:49
+        - arn:aws:lambda:us-east-2:017000801446:layer:AWSLambdaPowertoolsPythonV2:67
         - !Ref DependenciesLayer
       PackageType: Zip
       Policies:
@@ -66,9 +67,9 @@ Resources:
                 - cloudwatch:GetMetricData
                 - xray:GetTraceSummaries
                 - xray:BatchGetTraces
-              Resource: '*'
+              Resource: "*"
             - Effect: Allow
               Action:
                 - bedrock:InvokeModel
-              Resource: arn:*:bedrock:*::foundation-model/*     
+              Resource: arn:*:bedrock:*::foundation-model/*
       Tracing: Active
