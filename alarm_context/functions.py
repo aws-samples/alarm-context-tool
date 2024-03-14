@@ -1,11 +1,10 @@
 import boto3
 import botocore
+
 import json
 import datetime
 import urllib.parse
-import base64
 import re
-import logging
 
 from aws_lambda_powertools import Logger
 logger = Logger()
@@ -289,6 +288,46 @@ def get_information_panel(panel_title, panel_content):
     information_panel += '</table>'
     return information_panel    
     
+def get_html_table_with_fields(title, items_list, fields=None):
+    """
+    Returns an HTML table with the specified title and items_list.
+
+    Parameters:
+    title (str): Title of the table.
+    items_list (list): List of dictionaries containing the data to populate the table.
+    fields (list): List of fields to display in the table. If None, all fields are displayed.
+
+    Returns:
+    str: HTML table as a string.
+
+    """
+    # Define table header and CSS styles
+    html_table = f'<table id="info" width="640" style="word-wrap: anywhere; max-width:640px !important; border-collapse: collapse; margin-bottom:10px;" cellpadding="2" cellspacing="0" width="100%" align="center" border="0">'
+    html_table += f'<tr><td colspan="{len(fields)}"><center><b>{title}</b></center></td></tr>'
+    html_table += '<style>table#info tr{border:1px solid #232F3E;}  table#info tr:nth-child(even) { background-color:#D4DADA; } table#info tr:nth-child(odd) { background-color:#F1F3F3; }</style>'
+
+    # Add table headers
+    if fields:
+        html_table += '<tr>'
+        for field in fields:
+            html_table += f'<th>{field}</th>'
+        html_table += '</tr>'
+
+    # Add table rows
+    for item in items_list:
+        html_table += '<tr>'
+        for field in fields or item.keys():
+            # Check if field value is decorated
+            if isinstance(item.get(field), dict) and 'value' in item[field] and 'link' in item[field]:
+                value = item[field]['value']
+                link = item[field]['link']
+                html_table += f'<td><a href="{link}">{value}</a></td>'
+            else:
+                html_table += f'<td>{item.get(field, "")}</td>'
+        html_table += '</tr>'
+
+    html_table += '</table>'
+    return html_table
 
 def get_html_table(title, items_dict):
     """

@@ -14,7 +14,7 @@ from functions import process_traces
 from aws_lambda_powertools import Logger
 logger = Logger()
 
-def process_sns_topic(message, region, account_id, namespace, change_time, annotation_time, start_time, end_time, start, end):
+def process_sns_topic(dimensions, region, account_id, namespace, change_time, annotation_time, start_time, end_time, start, end):
     """
     Processes the given SNS topic message and generates additional information, log information, summary and widget images.
     
@@ -34,7 +34,7 @@ def process_sns_topic(message, region, account_id, namespace, change_time, annot
     - A dictionary
     """
 
-    for elements in message['Trigger']['Dimensions']:
+    for elements in dimensions:
         if elements['name'] == 'TopicName':
             id = elements['value']
             link = 'https://%s.console.aws.amazon.com/sns/v3/home?region=%s#/topic/arn:aws:sns:%s:%s:%s' % (region, region, region, account_id, str(id))   

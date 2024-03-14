@@ -11,30 +11,9 @@ from functions import get_metrics_from_dashboard_metrics
 from aws_lambda_powertools import Logger
 logger = Logger()
 
-def process_ec2(message, region, account_id, namespace, change_time, annotation_time, start_time, end_time, start, end):
-    
-    # Get Metric Details
-    comparison_operator = message['Trigger']['ComparisonOperator']
-    evaluation_periods = message['Trigger']['EvaluationPeriods']
-    period = message['Trigger']['Period']    
-    
-    # Check if 'Namespace' is directly under 'Trigger', if not, look for it in the nested structure
-    if 'Namespace' in message['Trigger']:
-        namespace = message['Trigger']['Namespace']
-        metric_name = message['Trigger']['MetricName']
-        annotation_value = message['Trigger']['Threshold']
-        dimensions = message['Trigger']['Dimensions']         
-        statistic = message['Trigger']['Statistic']
-    else:
-        # Assuming 'Metrics' is always present and has at least one element with the required structure
-        namespace = message['Trigger']['Metrics'][0]['MetricStat']['Metric']['Namespace']
-        metric_name = message['Trigger']['Metrics'][0]['MetricStat']['Metric']['MetricName']
-        annotation_value = 0
-        dimensions = message['Trigger']['Metrics'][0]['MetricStat']['Metric']['Dimensions']    
-        statistic = message['Trigger']['Metrics'][0]['MetricStat']['Stat']    
+def process_ec2(dimensions, region, account_id, namespace, change_time, annotation_time, start_time, end_time, start, end): 
     
     # Possible Dimensions: AutoScalingGroupName, ImageId, InstanceId, InstanceType
-    #for elements in message['Trigger']['Dimensions']:
     for elements in dimensions:
         if elements['name'] == 'InstanceId':
             id = elements['value']

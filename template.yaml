@@ -10,6 +10,7 @@ Resources:
         - python3.12
     Metadata:
       BuildMethod: python3.12
+      BuildArchitecture: x86_64
 
   AlarmContextFunction:
     Type: AWS::Serverless::Function
@@ -56,6 +57,7 @@ Resources:
                 - lambda:GetFunction
                 - ses:SendRawEmail
                 - ecs:DescribeClusters
+                - ecs:DescribeTaskDefinition
                 - ssm:DescribeInstanceInformation
                 - dynamodb:DescribeTable
                 - autoscaling:DescribeAutoScalingGroups
@@ -67,6 +69,7 @@ Resources:
                 - cloudwatch:GetMetricData
                 - xray:GetTraceSummaries
                 - xray:BatchGetTraces
+                - ssm:ListCommands
               Resource: "*"
             - Effect: Allow
               Action:

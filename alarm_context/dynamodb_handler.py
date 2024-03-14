@@ -11,8 +11,8 @@ from functions import process_traces
 from aws_lambda_powertools import Logger
 logger = Logger()
 
-def process_dynamodb(message, region, account_id, namespace, change_time, annotation_time, start_time, end_time, start, end):
-    for elements in message['Trigger']['Dimensions']:
+def process_dynamodb(dimensions, region, account_id, namespace, change_time, annotation_time, start_time, end_time, start, end):
+    for elements in dimensions:
         if elements['name'] == 'TableName':
             id = elements['value']
             link = 'https://%s.console.aws.amazon.com/dynamodbv2/home?region=%s#table?name=%s&tab=monitoring' % (region, region, str(id))   

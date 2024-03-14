@@ -2,6 +2,9 @@
 # Update BotoCore first
 # Remove IDS from TD get_html_table and clean up HTML
 # REF (REMOVE): https://monitorportal.amazon.com/igraph?SchemaName1=Search&Pattern1=dataset%3D%24Prod%24%20marketplace%3D%24us-east-1%24%20hostgroup%3D%24ALL%24%20host%3D%24ALL%24%20servicename%3D%24AWSAlarmTriggerChecker%24%20methodname%3D%24TriggerChecker%24%20client%3D%24ALL%24%20metricclass%3D%24NONE%24%20instance%3D%24NONE%24%20StateTo.ALARM%20NOT%20metric%3D%28%24StateTo.ALARM%24%20OR%20%24Custom.StateTo.ALARM%24%20OR%20%24External.StateTo.ALARM%24%20OR%20%24AWS.OneHour.StateTo.ALARM%24%20OR%20%24ThirtySeconds.StateTo.ALARM%24%20OR%20%24OneMinute.StateTo.ALARM%24%20OR%20%24Custom.StandardResolution.StateTo.ALARM%24%20OR%20%24FiveMinutes.StateTo.ALARM%24%20OR%20%24Custom.OneHour.StateTo.ALARM%24%20OR%20%24Custom.HighResolution.StateTo.ALARM%24%20OR%20%24Custom.ThirtySeconds.StateTo.ALARM%24%20OR%20%24Custom.OneMinute.StateTo.ALARM%24%20OR%20%24StandardResolution.StateTo.ALARM%24%20OR%20%24OneHour.StateTo.ALARM%24%20OR%20%24TenSeconds.StateTo.ALARM%24%20OR%20%24AWS.StandardResolution.StateTo.ALARM%24%20OR%20%24AWS.FiveMinutes.StateTo.ALARM%24%20OR%20%24External.Delay.StateTo.ALARM%24%20OR%20%24Custom.FiveMinutes.StateTo.ALARM%24%20OR%20%24HighResolution.StateTo.ALARM%24%20OR%20%24Delay.StateTo.ALARM%24%20OR%20%24Custom.TenSeconds.StateTo.ALARM%24%20OR%20%24MoreThanOneHour.StateTo.ALARM%24%20OR%20%24AWS.BetweenFiveMinutesAndOneHour.StateTo.ALARM%24%20OR%20%24AWS.BetweenOneAndFiveMinutes.StateTo.ALARM%24%20OR%20%24External.PersistantFailure.StateTo.ALARM%24%20OR%20%24AWS.MoreThanOneHour.StateTo.ALARM%24%20OR%20%24AWS.OneMinute.StateTo.ALARM%24%20OR%20%24AWS.StateTo.ALARM%24%20OR%20%24BetweenFiveMinutesAndOneHour.StateTo.ALARM%24%20OR%20%24Custom.BetweenOneAndFiveMinutes.StateTo.ALARM%24%20OR%20%24PersistantFailure.StateTo.ALARM%24%20OR%20%24Custom.BetweenFiveMinutesAndOneHour.StateTo.ALARM%24%20OR%20%24Custom.MoreThanOneHour.StateTo.ALARM%24%20OR%20%24BetweenOneAndFiveMinutes.StateTo.ALARM%24%20OR%20%24UnknownNamespace.StateTo.ALARM%24%29%20schemaname%3DService&Period1=OneMinute&Stat1=sum&HeightInPixels=406&WidthInPixels=1717&GraphTitle=Top%2030%20AWS%20Services%20Transitioning%20to%20ALARM&TZ=UTC@TZ%3A%20UTC&LabelLeft=INSUFFICIENT_DATA%20transitions&StartTime1=2023-01-30T08%3A23%3A00Z&EndTime1=2023-01-30T11%3A23%3A00Z&FunctionExpression1=SORT%28desc%2C%20max%2C%20S1%2C1%2C30%29&FunctionLabel1=%7BmetricLabel%7D%20%5Bmax%3A%20%7Bmax%7D%5D&FunctionYAxisPreference1=left
+# 
+# Manually trigger an alarm using the following command:
+# aws cloudwatch set-alarm-state --state-value ALARM --state-reason "Testing" --alarm-name "myalarm"
 import boto3
 import json
 import os
@@ -212,25 +215,25 @@ def alarm_handler(event, context):
     additional_metrics_with_timestamps_removed = ''
     
     if namespace == "AWS/EC2":
-        response = ec2_handler.process_ec2(message, region, account_id, namespace, change_time, annotation_time, start_time, end_time, start, end)
+        response = ec2_handler.process_ec2(dimensions, region, account_id, namespace, change_time, annotation_time, start_time, end_time, start, end)
 
     elif namespace == "CloudWatchSynthetics":
-        response = synthetics_handler.process_synthetics(message, region, account_id, namespace, change_time, annotation_time, start_time, end_time, start, end)
+        response = synthetics_handler.process_synthetics(dimensions, region, account_id, namespace, change_time, annotation_time, start_time, end_time, start, end)
 
     elif namespace == "AWS/SNS":
-        response = sns_handler.process_sns_topic(message, region, account_id, namespace, change_time, annotation_time, start_time, end_time, start, end)
+        response = sns_handler.process_sns_topic(dimensions, region, account_id, namespace, change_time, annotation_time, start_time, end_time, start, end)
 
     elif namespace == "AWS/DynamoDB":
-        response = dynamodb_handler.process_dynamodb(message, region, account_id, namespace, change_time, annotation_time, start_time, end_time, start, end)
+        response = dynamodb_handler.process_dynamodb(dimensions, region, account_id, namespace, change_time, annotation_time, start_time, end_time, start, end)
 
-    elif namespace == "AWS/ECS":
-        additional_information, log_information, additional_summary, widget_images, id = ecs_handler.process_ecs(message, region, account_id, namespace, change_time, annotation_time, start_time, end_time, start, end)
+    elif namespace in ("AWS/ECS", "ECS/ContainerInsights"):
+        response = ecs_handler.process_ecs(dimensions, region, account_id, namespace, change_time, annotation_time, start_time, end_time, start, end)
 
     elif namespace == "AWS/Lambda":
-        additional_information, log_information, additional_summary, widget_images, id = lambda_handler.process_lambda(message, region, account_id, namespace, change_time, annotation_time, start_time, end_time, start, end)
+        response = lambda_handler.process_lambda(dimensions, region, account_id, namespace, change_time, annotation_time, start_time, end_time, start, end)
         
     elif namespace == "AWS/SSM-RunCommand":
-        additional_information, log_information, additional_summary, widget_images, id = ssm_run_command_handler.process_ssm_run_command(message, region, account_id, namespace, change_time, annotation_time, start_time, end_time, start, end)        
+        response = ssm_run_command_handler.process_ssm_run_command(metric_name, dimensions, region, account_id, namespace, change_time, annotation_time, start_time, end_time, start, end)        
         id = metric_name
         
     elif namespace == "AWS/ApplicationELB":
@@ -246,7 +249,7 @@ def alarm_handler(event, context):
         id = metric_name
         additional_information = ''
         namespace_defined = False
-        logger.info("undefined_namespace_dimensions", extra=message['Trigger']['Dimensions'])
+        logger.info("undefined_namespace_dimensions", extra={"namespace": namespace})
 
     if namespace_defined:
         contextual_links = response.get("contextual_links")
@@ -266,7 +269,7 @@ def alarm_handler(event, context):
             additional_information += contextual_links
         if log_information is not None: 
             additional_information += log_information
-        if log_information is not None: 
+        if resource_information is not None: 
             additional_information += resource_information             
         
     """

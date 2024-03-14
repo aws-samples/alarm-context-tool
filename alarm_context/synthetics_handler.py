@@ -1,8 +1,7 @@
 import boto3
 import botocore
-import json
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from functions import get_dashboard_button
 from functions import get_html_table
@@ -15,8 +14,8 @@ from functions import process_traces
 from aws_lambda_powertools import Logger
 logger = Logger()
 
-def process_synthetics(message, region, account_id, namespace, change_time, annotation_time, start_time, end_time, start, end):
-    for elements in message['Trigger']['Dimensions']:
+def process_synthetics(dimensions, region, account_id, namespace, change_time, annotation_time, start_time, end_time, start, end):
+    for elements in dimensions:
         if elements['name'] == 'CanaryName':
             id = elements['value']
             link = 'https://%s.console.aws.amazon.com/cloudwatch/home?region=%s#synthetics:canary/detail/%s' % (region, region, str(id))   
@@ -210,8 +209,7 @@ def process_synthetics(message, region, account_id, namespace, change_time, anno
             
             # Define the X-ray filter expression using the canary run ID
             filter_expression = f'annotation.aws:canary_run_id = "{canary_run_id}" and responsetime > 0'
-            logger.info("X-Ray Filter Expression", filter_expression=filter_expression)
-            
+            logger.info("X-Ray Filter Expression", filter_expression=filter_expression)            
             trace_summary, trace = process_traces(filter_expression, region, trace_start_time, trace_end_time)
 
         else:

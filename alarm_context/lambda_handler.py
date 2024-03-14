@@ -1,4 +1,6 @@
 import boto3
+import botocore 
+
 import datetime
 
 from functions import get_dashboard_button
@@ -6,29 +8,42 @@ from functions import get_html_table
 from functions import get_last_10_events
 from functions import get_log_insights_link
 from functions import build_dashboard
+from functions import get_metrics_from_dashboard_metrics
+from functions import process_traces
 
-def process_lambda(message, region, account_id, namespace, change_time, annotation_time, start_time, end_time, start, end):
-    
-    additional_information = ""
-    log_information = ""
-    summary = ""
-    print("Region: "+ region)
-    
-    for elements in message['Trigger']['Dimensions']:
+
+from aws_lambda_powertools import Logger
+logger = Logger()
+
+def process_lambda(dimensions, region, account_id, namespace, change_time, annotation_time, start_time, end_time, start, end):
+      
+    for elements in dimensions:
 
         if elements['name'] == 'FunctionName':
             id = elements['value']
 
             lambda_automatic_dashboard_link = 'https://%s.console.aws.amazon.com/cloudwatch/home?region=%s#home:dashboards/Lambda?~(alarmStateFilter~(~\'ALARM))' % (region, region)   
-            additional_information += get_dashboard_button("Lambda automatic dashboard" , lambda_automatic_dashboard_link) 
+            contextual_links = get_dashboard_button("Lambda automatic dashboard" , lambda_automatic_dashboard_link) 
             lambda_automatic_dashboard_link = 'https://%s.console.aws.amazon.com/lambda/home?region=%s#/functions/%s?tab=monitoring' % (region, region, str(id))   
-            additional_information += get_dashboard_button("Lambda Function Monitoring" , lambda_automatic_dashboard_link)  
-            
+            contextual_links += get_dashboard_button("Lambda Function Monitoring" , lambda_automatic_dashboard_link)
 
-            lambda_client = boto3.client('lambda', region_name=region) 
-            response = lambda_client.get_function(FunctionName=id)
+            # Get Function
+            lambda_client = boto3.client('lambda', region_name=region)
+            try:
+                response = lambda_client.get_function(FunctionName=id)
+            except botocore.exceptions.ClientError as error:
+                logger.exception("Error getting Lambda Function")
+                raise RuntimeError("Unable to fullfil request") from error  
+            except botocore.exceptions.ParamValidationError as error:
+                raise ValueError('The parameters you provided are incorrect: {}'.format(error))             
             
             layers = response['Configuration']['Layers']
+
+            # Code is too noisy, remove it
+            response.pop("Code", None)
+            resource_information = get_html_table("Function: " +id, response["Configuration"])
+            resource_information += get_html_table("Function: " +id, response["Tags"])            
+            resource_information_object = response["Configuration"]
             
             # Check if Lambda Insights is Enabled
             lambda_insights_enabled = False
@@ -40,9 +55,9 @@ def process_lambda(message, region, account_id, namespace, change_time, annotati
 
             if lambda_insights_enabled:
                 lambda_insights_link = f"https://{region}.console.aws.amazon.com/cloudwatch/home?region={region}#lambda-insights:functions/{id}"
-                additional_information += get_dashboard_button("Lambda Insights" , lambda_insights_link) 
+                contextual_links += get_dashboard_button("Lambda Insights" , lambda_insights_link) 
             else:
-                additional_information += '<p>You do not have Lambda Insights enabled for this Lambda function. CloudWatch Lambda Insights is a monitoring and troubleshooting solution for serverless applications running on AWS Lambda. The solution collects, aggregates, and summarizes system-level metrics including CPU time, memory, disk and network usage. It also collects, aggregates, and summarizes diagnostic information such as cold starts and Lambda worker shutdowns to help you isolate issues with your Lambda functions and resolve them quickly.<a href="https://%s.console.aws.amazon.com/lambda/home?region=%s#/functions/%s/edit/monitoring-tools?tab=configure">Enable Lambda Insights</a>' % (region, region, id)                
+                notifications = '<p>You do not have Lambda Insights enabled for this Lambda function. CloudWatch Lambda Insights is a monitoring and troubleshooting solution for serverless applications running on AWS Lambda. The solution collects, aggregates, and summarizes system-level metrics including CPU time, memory, disk and network usage. It also collects, aggregates, and summarizes diagnostic information such as cold starts and Lambda worker shutdowns to help you isolate issues with your Lambda functions and resolve them quickly.<a href="https://%s.console.aws.amazon.com/lambda/home?region=%s#/functions/%s/edit/monitoring-tools?tab=configure">Enable Lambda Insights</a>' % (region, region, id)                
 
             dashboard_metrics = [
                 {
@@ -118,14 +133,13 @@ def process_lambda(message, region, account_id, namespace, change_time, annotati
                         ["LambdaInsights", "total_network", "function_name", id]
                     ]
                 })
-                
-                
-            
-            widget_images = build_dashboard(dashboard_metrics, annotation_time, start, end, region)
+
+            widget_images = build_dashboard(dashboard_metrics, annotation_time, start, end, region) 
+            additional_metrics_with_timestamps_removed = get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, region)
 
             
             log_input = {"logGroupName": "/aws/lambda/" +id}
-            log_information += get_last_10_events(log_input, change_time, region) 
+            log_information, log_events =  get_last_10_events(log_input, change_time, region) 
             
             # Log Insights Link
             log_insights_query = """filter @message like /(?i)(Exception|error|fail)/ or @message LIKE /Task timed out/
@@ -133,11 +147,8 @@ def process_lambda(message, region, account_id, namespace, change_time, annotati
                 | sort @timestamp desc 
                 | limit 100"""
             log_insights_link = get_log_insights_link(log_input, log_insights_query, region, start_time, end_time)
-            additional_information += get_dashboard_button("Log Insights" , log_insights_link)                 
-            
-            #lambda_client = boto3.client('lambda', region_name=region) 
-            #response = lambda_client.get_function(FunctionName=id)
-            
+            contextual_links += get_dashboard_button("Log Insights" , log_insights_link)                 
+                       
             # These date formats are required for some console URLs
             start_time_str = str(datetime.datetime.strptime(start_time,'%Y-%m-%dT%H:%M:%S.%f%z').strftime('%Y-%m-%dT%H*3a%M*3a%S.%f')[:-3]) +"Z"
             end_time_str = str(datetime.datetime.strptime(end_time,'%Y-%m-%dT%H:%M:%S.%f%z').strftime('%Y-%m-%dT%H*3a%M*3a%S.%f')[:-3]) +"Z"
@@ -145,14 +156,37 @@ def process_lambda(message, region, account_id, namespace, change_time, annotati
             # Check if active tracing is enabled
             if response["Configuration"]["TracingConfig"]["Mode"] == "Active":
                 x_ray_traces_link = f"https://{region}.console.aws.amazon.com/cloudwatch/home?region={region}#xray:traces/query?~(query~(filter~()~expression~'service*28id*28name*3a*20*22{id}*22*2c*20type*3a*20*22AWS*3a*3aLambda*3a*3aFunction*22*29*29)~context~(timeRange~(end~'{end_time_str}~start~'{start_time_str})))"
-                additional_information += get_dashboard_button("X-Ray Traces" , x_ray_traces_link)
-            
-            # Code is too noisy, remove it
-            response.pop("Code", None)
-            resource_information = get_html_table("Function: " +id, response["Configuration"])
-            resource_information += get_html_table("Function: " +id, response["Tags"])
-    
-    additional_information += log_information
-    additional_information += resource_information   
+                contextual_links += get_dashboard_button("X-Ray Traces" , x_ray_traces_link)
 
-    return additional_information, log_information, summary, widget_images, id  
+                # Get Trace information
+                filter_expression = f'!OK and service(id(name: "{id}", type: "AWS::Lambda::Function")) '
+                logger.info("X-Ray Filter Expression", filter_expression=filter_expression)
+                trace_summary, trace = process_traces(filter_expression, region, start_time, end_time)                
+            else:
+                trace_summary = None
+                trace = None
+               
+        else:
+            contextual_links = None
+            log_information = None
+            log_events = None
+            resource_information = None
+            resource_information_object = None
+            widget_images = None
+            additional_metrics_with_timestamps_removed = None
+            trace_summary = None
+            trace = None
+            notifications = None
+
+    return {
+        "contextual_links": contextual_links,
+        "log_information": log_information,
+        "log_events": log_events,
+        "resource_information": resource_information,
+        "resource_information_object": resource_information_object,
+        "notifications": None,
+        "widget_images": widget_images,
+        "additional_metrics_with_timestamps_removed": additional_metrics_with_timestamps_removed,
+        "trace_summary": None,
+        "trace": None
+    }
