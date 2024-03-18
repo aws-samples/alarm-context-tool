@@ -38,7 +38,7 @@ def process_ssm_run_command(metric_name, dimensions, region, account_id, namespa
         additional_metrics_with_timestamps_removed = get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, region) 
                 
         # SSM Client
-        ssm_client = boto3.client('ssm')
+        ssm_client = boto3.client('ssm', region_name=region)
 
         # Date formats required for filters
         change_time_str = change_time.astimezone(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')

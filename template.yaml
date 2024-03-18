@@ -29,7 +29,10 @@ Resources:
       Environment:
         Variables:
           AWS_LAMBDA_LOG_LEVEL: DEBUG
-          BEDROCK_MODEL_ID: anthropic.claude-instant-v1
+          ANTHROPIC_VERSION: bedrock-2023-05-31
+          BEDROCK_MODEL_ID: anthropic.claude-3-sonnet-20240229-v1:0
+          BEDROCK_REGION: us-east-1
+          BEDROCK_MAX_TOKENS: 4000
           POWERTOOLS_LOG_LEVEL: DEBUG
           POWERTOOLS_SERVICE_NAME: Alarm
           RECIPIENT: aliving@amazon.com

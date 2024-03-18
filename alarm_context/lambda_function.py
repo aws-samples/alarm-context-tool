@@ -5,6 +5,15 @@
 # 
 # Manually trigger an alarm using the following command:
 # aws cloudwatch set-alarm-state --state-value ALARM --state-reason "Testing" --alarm-name "myalarm"
+# aws cloudwatch set-alarm-state --state-value ALARM --state-reason "Testing" --alarm-name ""
+#
+# Supports Anthropic Claude Models:
+#   Anthropic Claude Instant v1.2
+#   Anthropic Claude 2 v2
+#   Anthropic Claude 2 v2.1
+#   Anthropic Claude 3 Sonnet
+#   Anthropic Claude 3 Haiku 
+
 import boto3
 import json
 import os
@@ -230,18 +239,16 @@ def alarm_handler(event, context):
         response = ecs_handler.process_ecs(dimensions, region, account_id, namespace, change_time, annotation_time, start_time, end_time, start, end)
 
     elif namespace == "AWS/Lambda":
-        response = lambda_handler.process_lambda(dimensions, region, account_id, namespace, change_time, annotation_time, start_time, end_time, start, end)
+        response = lambda_handler.process_lambda(metric_name, dimensions, region, account_id, namespace, change_time, annotation_time, start_time, end_time, start, end)
         
     elif namespace == "AWS/SSM-RunCommand":
-        response = ssm_run_command_handler.process_ssm_run_command(metric_name, dimensions, region, account_id, namespace, change_time, annotation_time, start_time, end_time, start, end)        
-        id = metric_name
+        response = ssm_run_command_handler.process_ssm_run_command(metric_name, dimensions, region, account_id, namespace, change_time, annotation_time, start_time, end_time, start, end)
         
     elif namespace == "AWS/ApplicationELB":
-        additional_information, log_information, additional_summary, widget_images, id = application_elb_handler.process_application_elb(message, region, account_id, namespace, change_time, annotation_time, start_time, end_time, start, end)        
-        id = metric_name        
+        response = application_elb_handler.process_application_elb(dimensions, region, account_id, namespace, change_time, annotation_time, start_time, end_time, start, end) 
         
     elif namespace == "AWS/ApiGateway":
-        additional_information, log_information, additional_summary, widget_images, id = api_gateway.process_api_gateway(message, region, account_id, namespace, change_time, annotation_time, start_time, end_time, start, end)        
+        additional_information, log_information, additional_summary, widget_images, id = api_gateway.process_api_gateway(message, region, account_id, namespace, change_time, annotation_time, start_time, end_time, start, end)
 
     else:
         # Namespace not matched
@@ -346,9 +353,7 @@ def alarm_handler(event, context):
     
     logger.info("MetricData: " + MetricData)
 
-    prompt = f'''Human:
-    Your response will be displayed in an email to a user where a CloudWatch alarm has been triggered.
-    
+    prompt = f'''    
     The alarm message is contained in the <alarm> tag.
     Metric data for the metric that triggered the alarm is contained in the <metric> tag. The metric will be graphed below your response. The metric data contains 25 hours of data, comment on the last 24 hours of data and do a comparison with the last hour with the day before at the same time.
     A human readable message for the alarm is contained in the <summary> tag. The email will already contain this summary above your response.
@@ -411,12 +416,12 @@ def alarm_handler(event, context):
     The most important thing is to try to identify the root cause of potential issues with the information that you have.
     The actual values of the metrics in the <metric> tag should override the AlarmDescription in the <alarm> tag if there is a discrepancy
     The reponse must be in HTML, be structured with headers so its easy to read and include at least 3 links to relevant AWS documentation.
-    Do not include an introductory line or prompt for a follow up.
-    Assistant:
+    Do not include an introductory line or prompt for a follow up. 
     '''
     
     logger.info("bedrock_prompt", prompt=prompt)
 
+    '''
     # Construct the body content as a Python dictionary
     body_content = {
         "prompt": prompt,
@@ -428,16 +433,32 @@ def alarm_handler(event, context):
     
     # Serialize the body content dictionary
     body = json.dumps(body_content)
+    '''    
     
+    # <provider>.<model-name>-v<major-version>:<minor-version>
+    # Refactor using: https://docs.aws.amazon.com/bedrock/latest/userguide/model-parameters-anthropic-claude-messages.html#model-parameters-anthropic-claude-messages-overview
     
-    #<provider>.<model-name>-v<major-version>:<minor-version>
-    
+
     if os.environ.get('USE_BEDROCK'):
         model_name = os.environ.get('BEDROCK_MODEL_ID').split('.')[1].split('-v')[0].capitalize()
-        bedrock = boto3.client(service_name="bedrock-runtime",region_name='us-east-1')
+        bedrock = boto3.client(service_name="bedrock-runtime",region_name=os.environ.get('BEDROCK_REGION'))
+        system_prompt = "You are a devops engineer providing guidance about how to do root cause analysis. Your response will be displayed in an email to a user where a CloudWatch alarm has been triggered."
+        max_tokens = int(os.environ.get('BEDROCK_MAX_TOKENS'))
+        user_message =  {"role": "user", "content": prompt}
+        messages = [user_message]
+        body=json.dumps(
+            {
+                "anthropic_version": os.environ.get('ANTHROPIC_VERSION'),
+                "max_tokens": max_tokens,
+                "system": system_prompt,
+                "messages": messages,
+                "temperature": 0.5,
+                "top_k": 250,
+                "top_p": 0.999                
+            }  
+        )                       
         try:
             response = bedrock.invoke_model(body=body, modelId=os.environ.get('BEDROCK_MODEL_ID'))
-            #response = bedrock.invoke_model(body=body, modelId="anthropic.claude-instant-v1")
         except botocore.exceptions.ClientError as error:
             logger.exception("Error calling Bedrock")
             raise RuntimeError("Unable to fullfil request") from error  
@@ -445,7 +466,8 @@ def alarm_handler(event, context):
             raise ValueError('The parameters you provided are incorrect: {}'.format(error))   
         
         response_body = json.loads(response.get("body").read())
-        ai_response = get_information_panel(model_name + " says:", response_body.get("completion"))
+        logger.debug("Bedrock Response", extra=response_body) 
+        ai_response = get_information_panel(model_name + " says:", response_body["content"][0]["text"])
     else:
         ai_response = get_information_panel("Bedrock says:", "Bedrock analysis is disabled.")
 
