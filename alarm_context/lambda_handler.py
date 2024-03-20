@@ -159,7 +159,7 @@ def process_lambda(metric_name, dimensions, region, account_id, namespace, chang
                     contextual_links += get_dashboard_button("X-Ray Traces" , x_ray_traces_link)
 
                     # Get Trace information
-                    filter_expression = f'!OK and service(id(name: "{id}", type: "AWS::Lambda::Function")) '
+                    filter_expression = f'!OK and service(id(name: "{id}", type: "AWS::Lambda::Function")) AND service(id(account.id: "{account_id}"))'
                     logger.info("X-Ray Filter Expression", filter_expression=filter_expression)
                     trace_summary, trace = process_traces(filter_expression, region, start_time, end_time)                
                 else:
@@ -186,8 +186,8 @@ def process_lambda(metric_name, dimensions, region, account_id, namespace, chang
             "notifications": None,
             "widget_images": widget_images,
             "additional_metrics_with_timestamps_removed": additional_metrics_with_timestamps_removed,
-            "trace_summary": None,
-            "trace": None
+            "trace_summary": trace_summary,
+            "trace": trace
         }            
     elif metric_name:
         dashboard_metrics = [

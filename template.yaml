@@ -70,9 +70,12 @@ Resources:
                 - logs:FilterLogEvents
                 - cloudwatch:GetMetricWidgetImage
                 - cloudwatch:GetMetricData
+                - cloudwatch:DescribeAlarmHistory
                 - xray:GetTraceSummaries
                 - xray:BatchGetTraces
-                - ssm:ListCommands
+                - ssm:ListCommands     
+                - health:DescribeEvents
+                - health:DescribeEventDetails           
               Resource: "*"
             - Effect: Allow
               Action:

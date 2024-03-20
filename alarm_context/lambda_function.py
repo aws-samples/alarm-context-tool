@@ -14,6 +14,11 @@
 #   Anthropic Claude 3 Sonnet
 #   Anthropic Claude 3 Haiku 
 
+# TO DO
+# x-ray still needs some debugging - DONE
+# update test case function
+# AWS Health - DONE
+
 import boto3
 import json
 import os
@@ -42,17 +47,19 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
 
-
 from functions import get_dashboard_button
 from functions import get_information_panel
 from functions import get_html_table
 from functions import generate_main_metric_widget
 from functions import create_test_case
 from functions import correct_statistic_case
+from functions import event_details
+from functions import describe_events
+
+from  health_client import ActiveRegionHasChangedError
 
 from aws_lambda_powertools import Logger
 logger = Logger()
-
 
 def alarm_handler(event, context):
     # X-Ray
@@ -344,25 +351,55 @@ def alarm_handler(event, context):
     logger.info(metric_name +"Metric Data: " + str(response))
     MetricData = metric_name + "Metric Data: " + str(response)
     
-    """
-    Here is the text, inside <text></text> XML tags.
-    <text>
-    {{TEXT}}
-    </text>
-    """
-    
-    logger.info("MetricData: " + MetricData)
+    # Alarm History
+    try:
+        response = cloudwatch.describe_alarm_history(
+            AlarmName=alarm_name,
+            HistoryItemType='StateUpdate',
+            MaxRecords=100,
+            ScanBy='TimestampDescending'
+         )    
+    except botocore.exceptions.ClientError as error:
+        logger.exception("Error getting alarm history data")
+        raise RuntimeError("Unable to fullfil request") from error  
+    except botocore.exceptions.ParamValidationError as error:
+        raise ValueError('The parameters you provided are incorrect: {}'.format(error))      
+    logger.info("Alarm History" , extra=response)
+
+    for AlarmHistoryItem in response.get('AlarmHistoryItems', []):
+        AlarmHistoryItem.pop('AlarmName', None)
+        AlarmHistoryItem.pop('AlarmType', None)
+        AlarmHistoryItem.pop('HistoryData', None)
+        AlarmHistoryItem.pop('HistoryItemType', None) 
+    alarm_history = str(response)
+
+    # AWS Health
+    restart_workflow = True
+
+    while restart_workflow:
+        try:
+            health_events = describe_events(region)
+            restart_workflow = False
+        except ActiveRegionHasChangedError as are:
+            logger.info("The AWS Health API active region has changed. Restarting the workflow using the new active region!, %s", are)
 
     prompt = f'''    
     The alarm message is contained in the <alarm> tag.
-    Metric data for the metric that triggered the alarm is contained in the <metric> tag. The metric will be graphed below your response. The metric data contains 25 hours of data, comment on the last 24 hours of data and do a comparison with the last hour with the day before at the same time.
+    Metric data for the metric that triggered the alarm is contained in the <metric> tag. The metric will be graphed below your response. 
+    The metric data contains 25 hours of data, comment on the last 24 hours of data and do a comparison with the last hour with the day before at the same time.
     A human readable message for the alarm is contained in the <summary> tag. The email will already contain this summary above your response.
     
-
     Summarize the trigger for the alarm based on the metric and provide possible root causes and links to aws documentation that might help fix it. 
+    Use the alarm history in the <history> tags to understand the frequency of the alarm and describe this to the reader.
+    Using all of the available data, describe to the reader your interpretation of the immediacy that action is required to address the root cause.
     The response needs to be in HTML format, maximum header size should be h3. 
     Add headers to make the response more readable.
+
+    Use all of the available data to see if there are events in <health_events> that may be impacting the resources or warn the reader if there are upcoming events for related resources.
     
+    <history>
+    {alarm_history}
+    </history>
     <alarm>
     {message}
     </alarm>
@@ -372,6 +409,9 @@ def alarm_handler(event, context):
     <summary>
     {text_summary}
     </summary>
+    <health_events>
+    {health_events}
+    </health_events>
 
     '''
     
@@ -402,15 +442,23 @@ def alarm_handler(event, context):
         </additional_metrics>
         '''
 
-    if 'trace_summary' in locals():     
-        prompt += f'''
-        Also use the following trace summary contained in the <trace_summary> tag, it's likely to be the best source of information.
-        Comment on how the trace_summary shows the potential root cause.
-        <trace_summary>
-        {trace_summary}
-        </trace_summary>
-        Show all included resources in the trace_summary as an HTML table of resource type, resource name and resource ARN so that they can see what's involved. Use ServiceIds and ResourceARNs from trace_summary to build this table. Include all resouces even if they don't have an ARN
-        '''
+    if 'trace_summary' in locals():  
+        if not trace_summary["TraceSummaries"]:
+            prompt += f'''
+            There were no traces available or there were no traces that were not OK.
+            '''
+        else:
+            prompt += f'''
+            Also use the following trace summary contained in the <trace_summary> tag, it's likely to be the best source of information.
+            Comment on how the trace_summary shows the potential root cause. 
+            Do not output the trace to the reader in JSON format, if you quote it, it must be in human readable format.
+            When correlating the trace data with the alarm and metrics, be mindful that the trace may not have occurred at the same time as the alarm.
+            If necessary, explain that the trace may not have occurred at the same time as the alarm and any root cause may be correlated.
+            <trace_summary>
+            {trace_summary}
+            </trace_summary>
+            '''          
+
         
     prompt += f'''    
     The most important thing is to try to identify the root cause of potential issues with the information that you have.

@@ -296,7 +296,7 @@ def process_ecs(dimensions, region, account_id, namespace, change_time, annotati
 
             # Get Trace information
             # This will only work if the specified service name for X-Ray is the same as the ECS service name.
-            filter_expression = f'!OK and service(id(name: "{id}", type: "AWS::ECS::Container")) '
+            filter_expression = f'!OK and service(id(name: "{id}", type: "AWS::ECS::Container")) AND service(id(account.id: "{account_id}"))'
             logger.info("X-Ray Filter Expression", filter_expression=filter_expression)
             trace_summary, trace = process_traces(filter_expression, region, start_time, end_time)
 

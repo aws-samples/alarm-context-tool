@@ -112,7 +112,8 @@ def process_dynamodb(dimensions, region, account_id, namespace, change_time, ann
             resource_information_object = response['Table']
             
             # Get Trace information
-            filter_expression = f'!OK and service(id(name: "{id}", type: "AWS::DynamoDB::Table")) '
+            
+            filter_expression = f'!OK and service(id(name: "{id}", type: "AWS::DynamoDB::Table")) AND service(id(account.id: "{account_id}"))'
             logger.info("X-Ray Filter Expression", filter_expression=filter_expression)
             trace_summary, trace = process_traces(filter_expression, region, start_time, end_time)
         else:

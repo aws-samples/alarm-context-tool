@@ -5,20 +5,71 @@ import json
 import datetime
 import urllib.parse
 import re
+import pandas as pd
+
+from  health_client import HealthClient
 
 from aws_lambda_powertools import Logger
 logger = Logger()
 
+# AWS Health Event Details
+def event_details(event_arns):
+    event_descriptions = {}
+    batch_size = 10
+    batches = [event_arns[i:i + batch_size] for i in range(0, len(event_arns), batch_size)]
+
+    for batch in batches:
+        event_details_response = HealthClient.client().describe_event_details(eventArns=batch)
+        for event_details in event_details_response['successfulSet']:
+            event_arn = event_details['event']['arn']
+            event_description = event_details['eventDescription']['latestDescription']
+            event_descriptions[event_arn] = event_description
+
+    return event_descriptions
+
+# AWS Health Events
+def describe_events(region):
+    events_paginator = HealthClient.client().get_paginator('describe_events')
+    events_pages = events_paginator.paginate(filter={
+        'startTimes': [
+            {
+                'from': datetime.datetime.now() - datetime.timedelta(days=7)
+            }
+        ],
+        'regions': [
+            region,
+        ],
+        'eventStatusCodes': ['open', 'upcoming']
+    })
+
+    event_arns = []
+    for events_page in events_pages:
+        for event in events_page['events']:
+            event_arns.append(event['arn'])
+
+    if event_arns:
+        event_descriptions = event_details(event_arns)
+        return event_descriptions
+    else:
+        logger.info('There are no AWS Health events that match the given filters')
+        return {}
+
 def process_traces(filter_expression, region, trace_start_time, trace_end_time):
     # Initialize the boto3 client for AWS X-Ray
-    xray = boto3.client('xray', region_name=region)             
+    xray = boto3.client('xray', region_name=region)   
+
+    # Sometimes alarms are triggered by issues where there is no error or fault in the trace
+    # Subtract another 21 hours
+    start_datetime = datetime.datetime.strptime(trace_start_time, '%Y-%m-%dT%H:%M:%S.%f%z')
+    adjusted_datetime = start_datetime - datetime.timedelta(hours=21)
+    trace_start_time = adjusted_datetime.strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + adjusted_datetime.strftime('%z')          
 
     try:
         # Retrieve the trace summaries
         response = xray.get_trace_summaries(
             StartTime=trace_start_time,
             EndTime=trace_end_time,
-            TimeRangeType='TraceId',
+            TimeRangeType='Event',
             Sampling=False,
             FilterExpression=filter_expression
         )       
@@ -30,18 +81,48 @@ def process_traces(filter_expression, region, trace_start_time, trace_end_time):
     
     # Log the trace ID
     for trace_summary in response.get('TraceSummaries', []):
-        logger.info("Canary Trace ID", trace_summary_id=trace_summary.get('Id'))
+        logger.info("Trace ID", trace_summary_id=trace_summary.get('Id'))
+
+    # Print the response as a JSON string on one line
+    logger.info("Trace Summary", extra=response)        
 
     response_json = json.dumps(response, default=json_serial)
     trace_summary = ''.join(response_json.split())
     trace_summary = response
-    
-    # Print the response as a JSON string on one line
-    logger.info("Trace Summary", extra=response)
 
+    # Create a table containing the resources in the trace
+    # Initialize list for combined data
+    combined_data = []
+
+    # Extract and combine service IDs with Type AWS::EC2::Instance and their InstanceIds
+    for summary in response["TraceSummaries"]:
+        instance_ids = [instance["Id"] for instance in summary.get("InstanceIds", [])]
+        for service in summary["ServiceIds"]:
+            # Special treatment for EC2 instance types
+            if service["Type"] == "AWS::EC2::Instance":
+                for instance_id in instance_ids:
+                    combined_data.append({"Name": service["Name"], "Type": service["Type"], "InstanceId": instance_id})
+            else:
+                # General treatment for all other service types
+                combined_data.append({"Name": service["Name"], "Type": service["Type"], "InstanceId": None})
     
-    # Extract the trace ID
-    trace_id = response['TraceSummaries'][0]['Id'] if response['TraceSummaries'] else None
+    # Process the data
+    df_combined = pd.DataFrame(combined_data).drop_duplicates().reset_index(drop=True)
+    html_combined = df_combined.to_html(index=False)
+
+    # Adjust the table
+    new_table_tag = '<table id="info" width="640" style="max-width:640px !important; border-collapse: collapse; margin-bottom:10px;" cellpadding="2" cellspacing="0" width="100%" align="center" border="0">'
+    html_combined = html_combined.replace('<table border="1" class="dataframe">', new_table_tag)
+    html_combined = html_combined.replace('<tr style="text-align: right;">','<tr>')
+    html_combined = html_combined.replace('<thead>', f'<thead><tr><th colspan="3" style="text-align: center;">Resources in Trace</th></tr>')
+    logger.info("Combined Data", html=html_combined)
+    
+    # Extract the latest trace ID
+    if response["TraceSummaries"]:
+        latest_trace = max(response["TraceSummaries"], key=lambda trace: trace["StartTime"]) 
+        trace_id = latest_trace["Id"]    
+    else:
+        trace_id = None
     
     if trace_id:
         try:
@@ -59,7 +140,8 @@ def process_traces(filter_expression, region, trace_start_time, trace_end_time):
         html = generate_trace_html(response, region, trace_start_time, trace_end_time)  
         
         # Minimize the HTML content by removing newlines and redundant whitespace
-        minimized_trace_html_content = ' '.join(html.split())
+        minimized_trace_html_content = html_combined
+        minimized_trace_html_content += ' '.join(html.split())
         
         # Print the minimized HTML content to the logs in one line
         logger.info("Trace HTML", html=minimized_trace_html_content)                
@@ -73,7 +155,8 @@ def generate_trace_html(traces_response, region, start_time, end_time):
     
     for trace in traces_response.get('Traces', []):
         trace_id =  trace.get('Id') 
-    
+   
+   
    # Check if start_time and end_time are string instances and parse them if true
     if isinstance(start_time, str):
         start_time = datetime.datetime.strptime(start_time, '%Y-%m-%dT%H:%M:%S.%f%z')
@@ -711,7 +794,7 @@ def get_last_10_events(log_input, timestamp, region):
             if not log_events:
                 html_table = '<p>No log events found.</p>'
             else:
-                html_table += '<table id="info"width="640" style="max-width:640px !important; border-collapse: collapse; margin-bottom:10px;" cellpadding="2" cellspacing="0" width="100%" align="center" border="0">'
+                html_table += '<table id="info" width="640" style="max-width:640px !important; border-collapse: collapse; margin-bottom:10px;" cellpadding="2" cellspacing="0" width="100%" align="center" border="0">'
                 html_table += f'<tr><th colspan="2">Log group: {log_group}<br>Log stream: {log_stream_name}</th></tr>'
                 html_table += '<tr><th>Timestamp</th><th>Message</th></tr>'
                 for event in log_events:

@@ -106,7 +106,7 @@ def process_sns_topic(dimensions, region, account_id, namespace, change_time, an
             resource_information_object = response['Attributes']
             
             # Get Trace information
-            filter_expression = f'!OK and service(id(name: "{id}", type: "AWS::SNS::Topic")) '
+            filter_expression = f'!OK and service(id(name: "{id}", type: "AWS::SNS::Topic")) AND service(id(account.id: "{account_id}"))'
             logger.info("X-Ray Filter Expression", filter_expression=filter_expression)
             trace_summary, trace = process_traces(filter_expression, region, start_time, end_time)
             

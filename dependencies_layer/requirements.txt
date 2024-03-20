@@ -1,2 +1,4 @@
 markdown
 boto3
+pandas
+dnspython
