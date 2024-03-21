@@ -28,8 +28,8 @@ import base64
 import markdown
 import botocore
 
-from aws_xray_sdk.core import xray_recorder
-from aws_xray_sdk.core import patch_all
+#from aws_xray_sdk.core import xray_recorder
+#from aws_xray_sdk.core import patch_all
 
 import sns_handler
 import ec2_handler
@@ -50,22 +50,27 @@ from email.mime.application import MIMEApplication
 from functions import get_dashboard_button
 from functions import get_information_panel
 from functions import get_html_table
-from functions import generate_main_metric_widget
+from functions_metrics import generate_main_metric_widget
 from functions import create_test_case
-from functions import correct_statistic_case
-from functions import event_details
-from functions import describe_events
+from functions_metrics import correct_statistic_case
+from functions_health import describe_events
 
 from  health_client import ActiveRegionHasChangedError
 
 from aws_lambda_powertools import Logger
+from aws_lambda_powertools import Tracer
+from aws_lambda_powertools.utilities.typing import LambdaContext
 logger = Logger()
+tracer = Tracer()
 
+@logger.inject_lambda_context
+@logger.inject_lambda_context(log_event=True)
+@tracer.capture_lambda_handler
 def alarm_handler(event, context):
     # X-Ray
-    patch_all(double_patch=True)    
+    #patch_all(double_patch=True)    
     
-    # Print Boto 3 version
+    # Log Boto 3 version
     fields = {"boto3_version": boto3.__version__}
     logger.info("Starting", extra=fields)
 
@@ -171,6 +176,11 @@ def alarm_handler(event, context):
             'annotation_value': message['Trigger'].get('Threshold', '')  # Default to empty if Threshold not provided
         }
         metrics_array.append(metric_info)
+
+    tracer.put_annotation(key="Namespace", value=namespace)
+
+    for elements in dimensions:
+        tracer.put_annotation(key=elements['name'], value=elements['value'])
         
     # Datetime variables
     change_time = datetime.datetime.strptime(state_change_time, "%Y-%m-%dT%H:%M:%S.%f%z")
@@ -442,7 +452,7 @@ def alarm_handler(event, context):
         </additional_metrics>
         '''
 
-    if 'trace_summary' in locals():  
+    if 'trace_summary' in locals() and trace_summary and "TraceSummaries" in trace_summary: 
         if not trace_summary["TraceSummaries"]:
             prompt += f'''
             There were no traces available or there were no traces that were not OK.

@@ -3,15 +3,18 @@ import botocore
 
 from functions import get_dashboard_button
 from functions import get_html_table
-from functions import get_last_10_events
-from functions import get_log_insights_link
-from functions import build_dashboard
-from functions import get_metrics_from_dashboard_metrics
-from functions import process_traces
+from functions_logs import get_last_10_events
+from functions_xray import generate_trace_html
+from functions_metrics import build_dashboard
+from functions_metrics import get_metrics_from_dashboard_metrics
+from functions_xray import process_traces
 
 from aws_lambda_powertools import Logger
+from aws_lambda_powertools import Tracer
 logger = Logger()
+tracer = Tracer()
 
+@tracer.capture_method
 def process_ecs(dimensions, region, account_id, namespace, change_time, annotation_time, start_time, end_time, start, end):
     
     # Initialize variables

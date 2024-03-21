@@ -1,11 +1,16 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 import dns.resolver
+from aws_lambda_powertools import Logger
+from aws_lambda_powertools import Tracer
+logger = Logger()
+tracer = Tracer()
 
 class RegionLookupError(Exception):
-    """Rasied when there was a problem when looking up the active region"""
+    """Raised when there was a problem when looking up the active region"""
     pass
 
+@tracer.capture_method
 def active_region():
     qname = 'global.health.amazonaws.com'
     try:

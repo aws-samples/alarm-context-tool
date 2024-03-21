@@ -102,7 +102,7 @@ sam-alarm-context$ sam logs -n HelloWorldFunction --stack-name "sam-alarm-contex
 
 You can find more information and examples about filtering Lambda function logs in the [SAM CLI Documentation](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-logging.html).
 
-## Tests
+## Tests 
 
 Tests are defined in the `tests` folder in this project. Use PIP to install the test dependencies and run tests.
 

@@ -2,6 +2,10 @@
 # SPDX-License-Identifier: Apache-2.0
 from region_lookup import active_region
 import boto3
+from aws_lambda_powertools import Logger
+from aws_lambda_powertools import Tracer
+logger = Logger()
+tracer = Tracer()
 
 class ActiveRegionHasChangedError(Exception):
     """Rasied when the active region has changed"""
@@ -12,6 +16,7 @@ class HealthClient:
     __client = None
 
     @staticmethod
+    @tracer.capture_method
     def client():
         if not HealthClient.__active_region:
             HealthClient.__active_region = active_region()
