@@ -1,12 +1,12 @@
 import boto3
-import botocore 
+import botocore
 
 import datetime
 
 from functions import get_dashboard_button
 from functions import get_html_table
 from functions_logs import get_last_10_events
-from functions_xray import generate_trace_html
+from functions_logs import get_log_insights_link
 from functions_metrics import build_dashboard
 from functions_metrics import get_metrics_from_dashboard_metrics
 from functions_xray import process_traces

@@ -33,6 +33,7 @@ Resources:
           BEDROCK_MODEL_ID: anthropic.claude-3-sonnet-20240229-v1:0
           BEDROCK_REGION: us-east-1
           BEDROCK_MAX_TOKENS: 4000
+          METRIC_ROUNDING_PRECISION_FOR_BEDROCK: 3
           POWERTOOLS_LOG_LEVEL: INFO
           POWERTOOLS_LOGGER_LOG_EVENT: "True"
           POWERTOOLS_SERVICE_NAME: Alarm
@@ -64,6 +65,7 @@ Resources:
                 - ecs:DescribeTaskDefinition
                 - ssm:DescribeInstanceInformation
                 - dynamodb:DescribeTable
+                - dynamodb:ListTagsOfResource
                 - autoscaling:DescribeAutoScalingGroups
                 - logs:GetLogEvents
                 - logs:FilterLogEvents
@@ -76,7 +78,8 @@ Resources:
                 - xray:BatchGetTraces
                 - ssm:ListCommands     
                 - health:DescribeEvents
-                - health:DescribeEventDetails           
+                - health:DescribeEventDetails    
+                - cloudformation:GetTemplate      
               Resource: "*"
             - Effect: Allow
               Action:

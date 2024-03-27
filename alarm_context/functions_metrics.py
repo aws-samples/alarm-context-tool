@@ -2,6 +2,7 @@ import boto3
 import json
 import datetime
 import re
+import os
 
 from aws_lambda_powertools import Logger
 from aws_lambda_powertools import Tracer
@@ -310,7 +311,8 @@ def get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, regi
         for metric_data_result in response.get('MetricDataResults', []):
             metric_id = metric_data_result.get('Id')
             details = next((item for item in query_details if item['id'] == metric_id), {})
-
+            if 'Values' in metric_data_result:
+                metric_data_result['Values'] = [round(value, int(os.environ.get('METRIC_ROUNDING_PRECISION_FOR_BEDROCK'))) for value in metric_data_result['Values']]                    
             if details.get('is_expression'):
                 metric_data_result['expression'] = details.get('expression')
             else:
@@ -331,3 +333,62 @@ def get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, regi
         all_responses.append(response)
 
     return all_responses
+
+@tracer.capture_method
+def get_metric_array(trigger):
+    """
+    Parses the 'Trigger' part of the message and extracts metric information including dimensions.
+    Returns namespace, metric_name, statistic, dimensions, and the metrics array.
+    """
+    metrics_array = []
+    namespace = None
+    metric_name = None
+    statistic = None
+    dimensions = []
+
+    if 'Namespace' in trigger:
+        namespace = trigger['Namespace']
+        metric_name = trigger['MetricName']
+        statistic = correct_statistic_case(trigger['Statistic'])
+        dimensions = trigger['Dimensions']
+        metrics_array.append({
+            'type': 'Direct',
+            'id': 'm1',
+            'namespace': namespace,
+            'metric_name': metric_name,
+            'dimensions': dimensions,
+            'statistic': statistic,
+            'label': trigger.get('Label', ''),
+            'annotation_value': trigger.get('Threshold', '')
+        })
+
+    elif 'Metrics' in trigger:
+        for metric in trigger['Metrics']:
+            if 'MetricStat' in metric:
+                metric_info = metric['MetricStat']['Metric']
+                if namespace is None:
+                    namespace = metric_info['Namespace']
+                    metric_name = metric_info['MetricName']
+                    statistic = correct_statistic_case(metric['MetricStat']['Stat'])
+                    dimensions = metric_info['Dimensions']
+                metrics_array.append({
+                    'type': 'MetricStat',
+                    'id': metric['Id'],
+                    'namespace': metric_info['Namespace'],
+                    'metric_name': metric_info['MetricName'],
+                    'dimensions': metric_info['Dimensions'],
+                    'statistic': correct_statistic_case(metric['MetricStat']['Stat']),
+                    'label': metric.get('Label', '')
+                })
+            elif 'Expression' in metric:
+                metrics_array.append({
+                    'type': 'Expression',
+                    'id': metric['Id'],
+                    'expression': metric['Expression'],
+                    'label': metric.get('Label', '')
+                })
+
+    if not namespace or not metric_name or not statistic or not dimensions:
+        raise ValueError("Required metric details not found in Alarm message")
+
+    return namespace, metric_name, statistic, dimensions, metrics_array

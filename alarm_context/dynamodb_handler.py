@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 
 from functions import get_dashboard_button
 from functions import get_html_table
+from functions import get_html_table_with_fields
 from functions_metrics import build_dashboard
 from functions_metrics import get_metrics_from_dashboard_metrics 
 from functions_xray import process_traces
@@ -109,13 +110,23 @@ def process_dynamodb(dimensions, region, account_id, namespace, change_time, ann
                 raise RuntimeError("Unable to fullfil request") from error  
             except botocore.exceptions.ParamValidationError as error:
                 raise ValueError('The parameters you provided are incorrect: {}'.format(error))
-                
-              
+                            
             resource_information = get_html_table("DynamoDB Table: " +id, response['Table'])  
             resource_information_object = response['Table']
+
+            # Get Tags
+            try:
+                response = ddb.list_tags_of_resource(ResourceArn=response['Table']['TableArn']) 
+            except botocore.exceptions.ClientError as error:
+                logger.exception("Error listing DynamoDB tags")
+                raise RuntimeError("Unable to fullfil request") from error  
+            except botocore.exceptions.ParamValidationError as error:
+                raise ValueError('The parameters you provided are incorrect: {}'.format(error))            
+            logger.info("DynamoDB Tags" , extra=response)
+            resource_information += get_html_table_with_fields("DynamoDB Table Tags: " +id, response['Tags'])  
+            tags = response['Tags']
             
-            # Get Trace information
-            
+            # Get Trace information            
             filter_expression = f'!OK and service(id(name: "{id}", type: "AWS::DynamoDB::Table")) AND service(id(account.id: "{account_id}"))'
             logger.info("X-Ray Filter Expression", filter_expression=filter_expression)
             trace_summary, trace = process_traces(filter_expression, region, start_time, end_time)
@@ -130,6 +141,7 @@ def process_dynamodb(dimensions, region, account_id, namespace, change_time, ann
             trace_summary = None
             trace = None
             notifications = None
+            tags = None
     
     return {
         "contextual_links": contextual_links,
@@ -141,5 +153,6 @@ def process_dynamodb(dimensions, region, account_id, namespace, change_time, ann
         "widget_images": widget_images,
         "additional_metrics_with_timestamps_removed": additional_metrics_with_timestamps_removed,
         "trace_summary": trace_summary,
-        "trace": trace
+        "trace": trace,
+        "tags": tags
     }

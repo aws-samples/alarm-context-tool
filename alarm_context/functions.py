@@ -151,6 +151,7 @@ def get_information_panel(panel_title, panel_content):
     information_panel += '</table>'
     return information_panel    
     
+'''
 @tracer.capture_method
 def get_html_table_with_fields(title, items_list, fields=None):
     """
@@ -192,6 +193,39 @@ def get_html_table_with_fields(title, items_list, fields=None):
 
     html_table += '</table>'
     return html_table
+'''
+
+@tracer.capture_method
+def get_html_table_with_fields(title, items_list, fields=None):
+    """
+    Returns an HTML table with the specified title and items_list.
+
+    Parameters:
+    title (str): Title of the table.
+    items_list (list): List of dictionaries containing the data to populate the table.
+    fields (list): List of fields to display in the table. If None, all fields from the first item are displayed.
+
+    Returns:
+    str: HTML table as a string.
+    """
+    # Determine fields from the first item if not explicitly provided
+    if not fields and items_list:
+        fields = list(items_list[0].keys())
+
+    # Define table header and CSS styles
+    html_table = f'<table id="info" width="640" style="word-wrap: anywhere; max-width:640px !important; border-collapse: collapse; margin-bottom:10px;" cellpadding="2" cellspacing="0" width="100%" align="center" border="0">'
+    html_table += f'<tr><td colspan="{len(fields)}" style="text-align:center;"><b>{title}</b></td></tr>'
+
+    # Add table headers
+    html_table += '<tr>' + ''.join(f'<th>{field}</th>' for field in fields) + '</tr>'
+
+    # Add table rows
+    for item in items_list:
+        html_table += '<tr>' + ''.join(f'<td>{item.get(field, "")}</td>' for field in fields) + '</tr>'
+
+    html_table += '</table>'
+    return html_table
+
 
 @tracer.capture_method
 def get_html_table(title, items_dict):
@@ -206,7 +240,6 @@ def get_html_table(title, items_dict):
     str: HTML table as a string.
 
     """    
-    #html_table  = '<style>table#info tr{border:1px solid #232F3E;}  table#info tr:nth-child(even) { background-color:#D4DADA; } table#info tr:nth-child(odd) { background-color:#F1F3F3; }</style>'
     html_table  = '<table id="info" width="640" style="word-wrap: anywhere; max-width:640px !important; border-collapse: collapse; margin-bottom:10px;" cellpadding="2" cellspacing="0" width="100%" align="center" border="0">'
     html_table += '<tr><td colspan="3"><center><b>%s</b></center></td></tr>' % (title)
     for key, value in items_dict.items():
@@ -219,8 +252,6 @@ def get_html_table(title, items_dict):
                     if len(items) == 2:
                         if i == 1:
                             html_table += '<tr><td id="0" rowspan="%s"><b>%s</b></td>' % (len(value)+1,key)
-                        #if type(items) == list:
-                        #    items = dict(items)
                         if type(items) == dict:
                             html_items += '<tr>'
                             for item_key, item_value in items.items():
@@ -298,3 +329,47 @@ def get_html_table(title, items_dict):
             html_table += '<tr><td id="10"><b>%s</b></td><td id="11" colspan="2" style="word-wrap: break-all;">%s</td></tr>'  % (key, value)
     html_table += "</table>"
     return html_table
+
+
+    """
+    Returns an HTML table with the specified title and items_dict.
+
+    Parameters:
+    - title (str): Title of the table.
+    - items_dict (dict): Dictionary containing the data to populate the table.
+
+    Returns:
+    - str: HTML table as a string.
+    """
+    def process_value(val):
+        """Convert values to strings, handle dictionaries, lists, and apply JSON formatting if necessary."""
+        if isinstance(val, dict):
+            return '<br>'.join([f"{k}: {process_value(v)}" for k, v in val.items()])
+        elif isinstance(val, list):
+            return '<br>'.join([process_value(v) for v in val])
+        elif isinstance(val, (int, float)):
+            return f"{val:.3f}" if isinstance(val, float) else str(val)
+        elif pd.isnull(val):
+            return "N/A"
+        return val
+
+    # Convert the items_dict into a DataFrame for easier manipulation
+    df = pd.DataFrame(list(items_dict.items()), columns=["Key", "Value"]).applymap(process_value)
+
+    # Use Styler to generate HTML table, add title, and apply custom CSS
+    styler = df.style.hide().set_table_attributes('id="info" width="640" style="word-wrap: anywhere; max-width:640px !important; border-collapse: collapse; margin-bottom:10px;" cellpadding="2" cellspacing="0" width="100%" align="center" border="0"').set_caption(title)
+
+    # Custom CSS for styling the table, headers, and rows
+    css = """
+    <style>
+        table#info tr { border:1px solid #232F3E; }
+        table#info th { background-color: #f2f2f2; }
+        table#info tr:nth-child(even) { background-color:#D4DADA; }
+        table#info tr:nth-child(odd) { background-color:#F1F3F3; }
+        table#info td, table#info th { padding: 8px; text-align: left; }
+        table#info caption { caption-side: top; font-size: 1.5em; font-weight: bold; text-align: center; padding: 10px; }
+    </style>
+    """
+    
+    # Return the styled HTML table as a string, with custom CSS applied
+    return css + styler.to_html()

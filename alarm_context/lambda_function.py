@@ -23,13 +23,10 @@ import boto3
 import json
 import os
 import datetime
-import urllib.parse
 import base64
-import markdown
+import yaml
 import botocore
-
-#from aws_xray_sdk.core import xray_recorder
-#from aws_xray_sdk.core import patch_all
+import re
 
 import sns_handler
 import ec2_handler
@@ -52,8 +49,10 @@ from functions import get_information_panel
 from functions import get_html_table
 from functions_metrics import generate_main_metric_widget
 from functions import create_test_case
-from functions_metrics import correct_statistic_case
+from functions_metrics import get_metric_array
 from functions_health import describe_events
+from functions_email import build_email_summary
+from functions_email import get_generic_links
 
 from  health_client import ActiveRegionHasChangedError
 
@@ -63,46 +62,34 @@ from aws_lambda_powertools.utilities.typing import LambdaContext
 logger = Logger()
 tracer = Tracer()
 
-@logger.inject_lambda_context
 @logger.inject_lambda_context(log_event=True)
 @tracer.capture_lambda_handler
 def alarm_handler(event, context):
-    # X-Ray
-    #patch_all(double_patch=True)    
     
     # Log Boto 3 version
     fields = {"boto3_version": boto3.__version__}
     logger.info("Starting", extra=fields)
 
-    # Log SNS Message
-    logger.info(event['Records'][0]['Sns']['Message'])
-    message = json.loads(event['Records'][0]['Sns']['Message'])
-    
-    runtime_region = os.environ['AWS_REGION']
-    
-    # Log JSON that can be used as a test case.
+    # Log JSON that can be used as a test case for this Lambda function
     test_case = create_test_case(event)
-    logger.info("test_case", extra=test_case)   
+    logger.info("test_case", extra=test_case)      
 
-    # Get Alarm Details
+    # =============================================================================
+    # Section: Initial variables
+    # =============================================================================
+
+    message = json.loads(event['Records'][0]['Sns']['Message'])    
+    runtime_region = os.environ['AWS_REGION']
     alarm_name = message['AlarmName']
     alarm_description = message['AlarmDescription']
-    old_state = message['OldStateValue']
     new_state = message['NewStateValue']
     reason = message['NewStateReason']
     state_change_time = message['StateChangeTime']
     alarm_arn = message['AlarmArn']
     region_name = message['Region']
-    aws_account = message['AWSAccountId']
-    
-    # Get Metric Details
-    comparison_operator = message['Trigger']['ComparisonOperator']
-    #data_points_to_alarm = message['Trigger']['DatapointsToAlarm']
-    evaluation_periods = message['Trigger']['EvaluationPeriods']
     period = message['Trigger']['Period']    
-    add_expression=False
-    metric_expression=None
-    
+
+    '''
     # Initialize namespace variable
     namespace = None
     
@@ -176,9 +163,13 @@ def alarm_handler(event, context):
             'annotation_value': message['Trigger'].get('Threshold', '')  # Default to empty if Threshold not provided
         }
         metrics_array.append(metric_info)
+    '''
 
+    # Get array of metrics and variables for first metric
+    namespace, metric_name, statistic, dimensions, metrics_array = get_metric_array(message['Trigger'])
+
+    # Add annotations to trace for Namespace and dimensions
     tracer.put_annotation(key="Namespace", value=namespace)
-
     for elements in dimensions:
         tracer.put_annotation(key=elements['name'], value=elements['value'])
         
@@ -191,6 +182,7 @@ def alarm_handler(event, context):
     end_time = end.strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + end.strftime('%z')
     display_change_time = change_time.strftime("%A %d %B, %Y %H:%M:%S %Z")   
 
+    # Extract Region and Account ID from alarm ARN
     elements = alarm_arn.split(':')
     result = {
         'arn': elements[0],
@@ -204,6 +196,7 @@ def alarm_handler(event, context):
     region = result['region']
     account_id = result['account_id']
 
+    '''
     # Message Summary
     text_summary = 'Your Amazon CloudWatch Alarm "%s" in the %s region has entered the %s state, because "%s" at "%s".' % (alarm_name, region_name, new_state, reason, display_change_time)
     summary  = '<p>Your Amazon CloudWatch Alarm <b>"%s"</b> in the <b>%s</b> region has entered the <b>%s</b> state, because <b>"%s"</b> at <b>"%s"</b>.<p>' % (alarm_name, region_name, new_state, reason, display_change_time)
@@ -221,24 +214,15 @@ def alarm_handler(event, context):
     encoded_alarm_name = urllib.parse.quote_plus(alarm_name)
     alarm_link = 'https://%s.console.aws.amazon.com/cloudwatch/deeplink.js?region=%s#alarmsV2:alarm/%s' % (region, region, encoded_alarm_name)
     summary += get_dashboard_button("View this alarm in the AWS Management Console", alarm_link)    
-
-    # Metric Details
-    metric_details = get_html_table("Metrics", message['Trigger'])
+    '''
     
-    # Alarm Details - Remove Trigger to avoid duplication
-    alarm_display = dict(message)
-    alarm_display.pop("Trigger", None)
-    alarm_details = get_html_table("Alarm", alarm_display)
 
-    # General Dashboards
-    cross_service_dashboard_link = 'https://%s.console.aws.amazon.com/cloudwatch/home?region=%s#home:cross_service' % (region, region)
-    generic_information = get_dashboard_button("Cross service dashboard", cross_service_dashboard_link)
-    aws_health_dashboard_link = 'https://health.aws.amazon.com/health/home'    
-    generic_information += get_dashboard_button("AWS Health dashboard", aws_health_dashboard_link)
+    namespace_defined = True    
     
-    namespace_defined = True
-    additional_information = generic_information
-    additional_metrics_with_timestamps_removed = ''
+
+    # =============================================================================
+    # Section: Process alarm by namespace
+    # =============================================================================    
     
     if namespace == "AWS/EC2":
         response = ec2_handler.process_ec2(dimensions, region, account_id, namespace, change_time, annotation_time, start_time, end_time, start, end)
@@ -270,10 +254,29 @@ def alarm_handler(event, context):
     else:
         # Namespace not matched
         # TO DO: use describe-metric-filters to see if this is a metric filter metric and then get log data.
-        id = metric_name
         additional_information = ''
         namespace_defined = False
-        logger.info("undefined_namespace_dimensions", extra={"namespace": namespace})
+        additional_metrics_with_timestamps_removed = ''
+        logger.info("undefined_namespace_dimensions", extra={"namespace": namespace})         
+
+    # =============================================================================
+    # Section: Build Email
+    # =============================================================================
+                    
+    text_summary = 'Your Amazon CloudWatch Alarm "%s" in the %s region has entered the %s state, because "%s" at "%s".' % (alarm_name, region_name, new_state, reason, display_change_time)
+    summary = build_email_summary(alarm_name, region_name, new_state, reason, display_change_time, alarm_description, region)
+    
+    # Metric Details
+    metric_details = get_html_table("Metrics", message['Trigger'])
+    
+    # Alarm Details - Remove Trigger to avoid duplication
+    alarm_display = dict(message)
+    alarm_display.pop("Trigger", None)
+    alarm_details = get_html_table("Alarm", alarm_display)
+
+    generic_information = get_generic_links(region)
+
+    additional_information = generic_information
 
     if namespace_defined:
         contextual_links = response.get("contextual_links")
@@ -286,6 +289,7 @@ def alarm_handler(event, context):
         additional_metrics_with_timestamps_removed = response.get("additional_metrics_with_timestamps_removed")
         trace_summary = response.get("trace_summary")
         trace_html = response.get("trace")
+        tags = response.get("tags", [])
         
         if notifications is not None:      
             summary += notifications
@@ -294,8 +298,10 @@ def alarm_handler(event, context):
         if log_information is not None: 
             additional_information += log_information
         if resource_information is not None: 
-            additional_information += resource_information             
-        
+            additional_information += resource_information  
+
+      
+
     """
     GreaterThanOrEqualToThreshold
     GreaterThanThreshold
@@ -313,8 +319,8 @@ def alarm_handler(event, context):
         
     # Get main widget    
     graph = generate_main_metric_widget(metrics_array, annotation_time, region, start_time, end_time)
-    logger.info("Dimensions", dimensions=dimensions)
     
+    logger.info("Dimensions", dimensions=dimensions)    
     dimensions = [{"Name": dim["name"], "Value": dim["value"]} for dim in dimensions]
     
     metric_data_start = change_time + datetime.timedelta(minutes=-1500)
@@ -351,15 +357,17 @@ def alarm_handler(event, context):
     
     # Enrich and clean the metric data results
     for metric_data_result in response.get('MetricDataResults', []):
-        metric_data_result.pop('Timestamps', None)
+        if 'Values' in metric_data_result:
+            metric_data_result['Values'] = [round(value, int(os.environ.get('METRIC_ROUNDING_PRECISION_FOR_BEDROCK'))) for value in metric_data_result['Values']]        
+        metric_data_result.pop('Timestamps', None)        
 
     # Optionally remove 'Messages', 'ResponseMetadata', and 'RetryAttempts' from the response
     response.pop('Messages', None)
     response.pop('ResponseMetadata', None)
     response.pop('RetryAttempts', None)    
     
-    logger.info(metric_name +"Metric Data: " + str(response))
-    MetricData = metric_name + "Metric Data: " + str(response)
+    logger.info(metric_name +" - Metric Data: " + str(response))
+    MetricData = metric_name + " - Metric Data: " + str(response)
     
     # Alarm History
     try:
@@ -425,7 +433,187 @@ def alarm_handler(event, context):
 
     '''
     
-    
+    if not tags:  # This will be True if tags is None or an empty list
+        logger.info("No tags found or 'Tags' is unassigned.")
+    else:
+        # Process the tags as needed
+        tags_found = False  # Flag to indicate if the desired tag is found
+        for tag in tags:
+            if tag['Value'].startswith('arn:aws:cloudformation:'):
+                tags_found = True
+                cloudformation_arn = tag['Value']
+
+                cloudformation = boto3.client('cloudformation', region_name=region)
+                # Get CloudFormation Template
+                try:
+                    response = cloudformation.get_template(
+                        StackName=cloudformation_arn,
+                        TemplateStage='Processed'
+                    )  
+                except botocore.exceptions.ClientError as error:
+                    logger.exception("Error getting CloudFormation template")
+                    raise RuntimeError("Unable to fullfil request") from error  
+                except botocore.exceptions.ParamValidationError as error:
+                    raise ValueError('The parameters you provided are incorrect: {}'.format(error))      
+                logger.info("CloudFormation Template" , extra=response)
+                
+                cloudformation_template =response['TemplateBody']
+
+                fault_root_cause_types = set()
+                error_root_cause_types = set()
+
+                if 'trace_summary' in locals() and trace_summary and "TraceSummaries" in trace_summary:
+                    print("trace_summary is not empty")  # Add this line
+                    if trace_summary["TraceSummaries"]:
+                        logger.info("In Loop")
+
+                        # Fault Root Cause Service Types: AWS::Lambda, AWS::Lambda::Function, AWS::ApiGateway::Stage
+                        def get_root_cause_service_types(root_causes):
+                            root_cause_types = set()
+
+                            for root_cause in root_causes:
+                                services = root_cause.get('Services', [])
+                                logger.info(f"Processing root cause with {len(services)} services")
+
+                                for service in services:
+                                    entity_path = service.get('EntityPath', [])
+                                    service_type = service.get('Type')
+
+                                    if service_type != 'remote':
+                                        for entity in entity_path:
+                                            if 'Exceptions' in entity and entity['Exceptions']:
+                                                root_cause_types.add(service_type)
+                                                if entity['Name'] == 'DynamoDB':
+                                                    root_cause_types.add('AWS::DynamoDB::Table')
+                                                logger.info(f"Added root cause type: {service_type}")
+
+                            root_cause_types_str = ', '.join(root_cause_types)
+                            logger.info(f"Root cause types found: {root_cause_types_str}")
+                            return root_cause_types
+
+                        if 'trace_summary' in locals() and trace_summary:
+                            print("trace_summary is not empty")
+                            if 'TraceSummaries' in trace_summary:
+                                logger.info("In Loop")
+
+                                for temp_trace_summary in trace_summary['TraceSummaries']:
+                                    print(f"Iterating over TraceSummary: {temp_trace_summary.get('Id')}")
+                                    fault_root_causes = temp_trace_summary.get('FaultRootCauses', [])
+                                    fault_root_cause_types = get_root_cause_service_types(fault_root_causes)
+                                    if fault_root_cause_types:
+                                        print(f"Trace ID: {temp_trace_summary.get('Id')}, Fault Root Cause Service Types: {', '.join(fault_root_cause_types)}")
+
+                                    error_root_causes = temp_trace_summary.get('ErrorRootCauses', [])
+                                    error_root_cause_types = get_root_cause_service_types(error_root_causes)
+                                    if error_root_cause_types:
+                                        print(f"Trace ID: {temp_trace_summary.get('Id')}, Error Root Cause Service Types: {', '.join(error_root_cause_types)}")                                    
+
+                def filter_resources_from_template(template_body, root_cause_types):
+                    # Determine if the template is JSON or YAML and parse accordingly
+                    try:
+                        template_dict = json.loads(template_body)
+                        format_used = 'json'
+                    except json.JSONDecodeError:
+
+                        def yaml_loader_with_custom_tags(loader, tag_suffix, node):
+                            return node.value
+
+                        # Register custom tag handlers
+                        yaml.SafeLoader.add_multi_constructor('!', yaml_loader_with_custom_tags)       
+
+                        try:
+                            template_dict = yaml.safe_load(template_body)
+                            format_used = 'yaml'
+                        except yaml.YAMLError as e:
+                            logger.error(f"Error parsing the CloudFormation template: {e}")
+                            return None
+                    
+                    # Filter resources
+                    filtered_resources = {}
+                    for resource_id, resource_details in template_dict.get('Resources', {}).items():
+                        resource_type = resource_details.get('Type')
+                        if resource_type in root_cause_types:
+                            filtered_resources[resource_id] = resource_details
+                    
+                    logger.info(f"Filtered resources based on root cause types ({format_used} format): {filtered_resources}")
+                    return filtered_resources
+
+                combined_root_cause_types = fault_root_cause_types | error_root_cause_types
+
+
+                filtered_resources = filter_resources_from_template(cloudformation_template, combined_root_cause_types)
+                if filtered_resources:
+                    # Process filtered resources as needed
+                    print(filtered_resources)
+                else:
+                    print("No resources matched or an error occurred.")       
+
+                # ----- TRYING truncating values   
+
+                def remove_comments(template_str):
+                    if template_str.strip().startswith('{'):
+                        # JSON template
+                        pattern = r'//.*?$|/\*(?:.|[\r\n])*?\*/'
+                        return re.sub(pattern, '', template_str, flags=re.MULTILINE)
+                    else:
+                        # YAML template
+                        lines = []
+                        for line in template_str.splitlines():
+                            if not line.strip().startswith('#'):
+                                lines.append(line)
+                        return '\n'.join(lines)
+
+                def truncate_values(obj, max_length=100):
+                    if isinstance(obj, str):
+                        return obj[:max_length]
+                    elif isinstance(obj, dict):
+                        return {k: truncate_values(v, max_length) for k, v in obj.items()}
+                    elif isinstance(obj, list):
+                        return [truncate_values(item, max_length) for item in obj]
+                    elif not isinstance(obj, (dict, list, str)):
+                        return obj
+                    else:
+                        return obj
+
+                def process_template(template_str, max_length):
+                    try:
+                        # Try to load the template as YAML
+                        template_obj = yaml.safe_load(template_str)
+                    except yaml.YAMLError:
+                        try:
+                            # Try to load the template as JSON
+                            template_obj = json.loads(template_str)
+                        except json.JSONDecodeError:
+                            return "Invalid template format"
+
+                    # Remove comments from the template string
+                    template_str = remove_comments(template_str)
+
+                    # Truncate values in the template object
+                    truncated_obj = truncate_values(template_obj, max_length)
+
+                    return truncated_obj
+
+                # Example use:
+                max_length = 50
+                preprocessed_template = process_template(cloudformation_template, max_length)
+                logger.info(preprocessed_template)    
+                print(len(cloudformation_template))       
+                print(len(preprocessed_template))              
+
+                prompt += f'''
+                The CloudFormation template used to create this resource is in the <cloudformation_template> tag. 
+                Values have been truncated to {max_length}.
+                Use the cloudformation_template and if there is a fix that can be made, call it out and tell the reader which code they need to change to resolve the issue.
+                If this is identifiable, it will be the most important information that the reader will want to see.
+                <cloudformation_template>
+                {preprocessed_template}
+                </cloudformation_template>
+                '''   
+
+                break  # Exit the loop once the desired tag is found    
+
+
     if 'resource_information_object' in locals():
         prompt += f'''
         Information about the resource related to the metric is contained in the <resource_information_object> tag.
@@ -475,28 +663,12 @@ def alarm_handler(event, context):
     The actual values of the metrics in the <metric> tag should override the AlarmDescription in the <alarm> tag if there is a discrepancy
     The reponse must be in HTML, be structured with headers so its easy to read and include at least 3 links to relevant AWS documentation.
     Do not include an introductory line or prompt for a follow up. 
+    If <cloudformation_template> exists, attempt to highlight a fix via changing the template in JSON format, presented in HTML, make the code change stand out.
     '''
     
     logger.info("bedrock_prompt", prompt=prompt)
 
-    '''
-    # Construct the body content as a Python dictionary
-    body_content = {
-        "prompt": prompt,
-        "max_tokens_to_sample": 4000,
-        "temperature": 1,
-        "top_k": 250,
-        "top_p": 0.999
-    }
     
-    # Serialize the body content dictionary
-    body = json.dumps(body_content)
-    '''    
-    
-    # <provider>.<model-name>-v<major-version>:<minor-version>
-    # Refactor using: https://docs.aws.amazon.com/bedrock/latest/userguide/model-parameters-anthropic-claude-messages.html#model-parameters-anthropic-claude-messages-overview
-    
-
     if os.environ.get('USE_BEDROCK'):
         model_name = os.environ.get('BEDROCK_MODEL_ID').split('.')[1].split('-v')[0].capitalize()
         bedrock = boto3.client(service_name="bedrock-runtime",region_name=os.environ.get('BEDROCK_REGION'))
