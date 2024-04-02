@@ -27,7 +27,7 @@ def process_ssm_run_command(metric_name, dimensions, region, account_id, namespa
             if metric not in metric_name:
                 dashboard_metrics.append(
                     {
-                        "title": metric_name,
+                        "title": metric,
                         "view": "timeSeries",
                         "stacked": False,
                         "stat": "Sum",

@@ -389,7 +389,8 @@ def get_metric_array(trigger):
                     'label': metric.get('Label', '')
                 })
 
-    if not namespace or not metric_name or not statistic or not dimensions:
+    #if not namespace or not metric_name or not statistic or not dimensions:
+    if not namespace or not metric_name or not statistic:            
         raise ValueError("Required metric details not found in Alarm message")
 
     return namespace, metric_name, statistic, dimensions, metrics_array

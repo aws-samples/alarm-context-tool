@@ -38,4 +38,5 @@ def get_alarm_history(region, alarm_name):
         AlarmHistoryItem.pop('AlarmType', None)
         AlarmHistoryItem.pop('HistoryData', None)
         AlarmHistoryItem.pop('HistoryItemType', None) 
-    alarm_history = str(response)    
+    alarm_history = str(response) 
+    return alarm_history   
