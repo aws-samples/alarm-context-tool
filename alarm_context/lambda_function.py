@@ -38,8 +38,6 @@ import ssm_run_command_handler
 import application_elb_handler
 import api_gateway
 
-from datetime import timedelta
-from botocore.exceptions import ClientError
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
@@ -53,6 +51,7 @@ from functions_metrics import get_metric_array
 from functions_health import describe_events
 from functions_email import build_email_summary
 from functions_email import get_generic_links
+from functions_alarm import get_alarm_history
 
 from  health_client import ActiveRegionHasChangedError
 
@@ -89,82 +88,6 @@ def alarm_handler(event, context):
     region_name = message['Region']
     period = message['Trigger']['Period']    
 
-    '''
-    # Initialize namespace variable
-    namespace = None
-    
-    # Check if Namespace is directly under Trigger
-    if 'Namespace' in message['Trigger']:
-        namespace = message['Trigger']['Namespace']
-        statistic = correct_statistic_case(message['Trigger']['Statistic'])
-        dimensions = message['Trigger']['Dimensions']
-        metric_name = message['Trigger']['MetricName']
-    else:
-        # Check if Metrics array is available
-        if 'Metrics' in message['Trigger']:
-            # Loop through Metrics array
-            for metric in message['Trigger']['Metrics']:
-                # Check if MetricStat is available in the metric
-                if 'MetricStat' in metric:
-                    # Extract namespace and break the loop
-                    namespace = metric['MetricStat']['Metric']['Namespace']
-                    statistic = correct_statistic_case(metric['MetricStat']['Stat'])
-                    dimensions = metric['MetricStat']['Metric']['Dimensions']
-                    metric_name = metric['MetricStat']['Metric']['MetricName']
-                    break
-    
-    # Handle the case where no namespace is found
-    if namespace is None:
-        # Handle error, e.g., log error, raise an exception, etc.
-        raise ValueError("Namespace not found in Alarm message")
-        
-
-    metrics_array = []
-    
-    if 'Metrics' in message['Trigger']:
-        # Handling multiple metrics scenario
-        for metric in message['Trigger']['Metrics']:
-            if "MetricStat" in metric:
-                # Handle standard metric
-                metric_info = {
-                    'type': 'MetricStat',
-                    'id': metric['Id'],
-                    'namespace': metric['MetricStat']['Metric']['Namespace'],
-                    'metric_name': metric['MetricStat']['Metric']['MetricName'],
-                    'dimensions': metric['MetricStat']['Metric']['Dimensions'],
-                    'statistic': correct_statistic_case(metric['MetricStat']['Stat']),
-                    'label': metric.get('Label', '')  # Default to empty if Label not provided
-                }
-                metrics_array.append(metric_info)
-            elif "Expression" in metric:
-                # Handle metric expression
-                metric_info = {
-                    'type': 'Expression',
-                    'id': metric['Id'],
-                    'expression': metric['Expression'],
-                    'label': metric.get('Label', '')  # Default to empty if Label not provided
-                }
-                metrics_array.append(metric_info)
-    else:
-        # Scenario with direct Namespace and MetricName
-        namespace = message['Trigger']['Namespace']
-        metric_name = message['Trigger']['MetricName']
-        dimensions = message['Trigger']['Dimensions']
-        corrected_statistic = correct_statistic_case(message['Trigger']['Statistic'])
-
-        metric_info = {
-            'type': 'Direct',
-            'id': 'm1',  # Assuming a default id for direct metrics
-            'namespace': namespace,
-            'metric_name': metric_name,
-            'dimensions': dimensions,
-            'statistic': corrected_statistic,
-            'label': message['Trigger'].get('Label', ''),  # Default to empty if Label not provided
-            'annotation_value': message['Trigger'].get('Threshold', '')  # Default to empty if Threshold not provided
-        }
-        metrics_array.append(metric_info)
-    '''
-
     # Get array of metrics and variables for first metric
     namespace, metric_name, statistic, dimensions, metrics_array = get_metric_array(message['Trigger'])
 
@@ -195,35 +118,13 @@ def alarm_handler(event, context):
     }
     region = result['region']
     account_id = result['account_id']
-
-    '''
-    # Message Summary
-    text_summary = 'Your Amazon CloudWatch Alarm "%s" in the %s region has entered the %s state, because "%s" at "%s".' % (alarm_name, region_name, new_state, reason, display_change_time)
-    summary  = '<p>Your Amazon CloudWatch Alarm <b>"%s"</b> in the <b>%s</b> region has entered the <b>%s</b> state, because <b>"%s"</b> at <b>"%s"</b>.<p>' % (alarm_name, region_name, new_state, reason, display_change_time)
-    summary += '<style>table#info tr{border:1px solid #232F3E;}  table#info tr:nth-child(even) { background-color:#D4DADA; } table#info tr:nth-child(odd) { background-color:#F1F3F3; }</style>'
-    
-    if not alarm_description:
-        panel_title = "Your alarm has no description."
-        panel_content = "Use alarm descriptions to add context and links to your alarms using markdown."
-        summary += get_information_panel(panel_title, panel_content)
-    else:
-        summary += '<table id="info" style="max-width:640px; border-collapse: collapse; margin-bottom:10px;" cellpadding="2" cellspacing="0" width="640" align="center" border="0">'    
-        summary += '<tr><td><center><b>Alarm Description</b></center></td></tr><tr><td>'
-        summary += markdown.markdown(alarm_description)
-        summary += '</td></tr></table>'
-    encoded_alarm_name = urllib.parse.quote_plus(alarm_name)
-    alarm_link = 'https://%s.console.aws.amazon.com/cloudwatch/deeplink.js?region=%s#alarmsV2:alarm/%s' % (region, region, encoded_alarm_name)
-    summary += get_dashboard_button("View this alarm in the AWS Management Console", alarm_link)    
-    '''
-    
-
-    namespace_defined = True    
-    
-
+  
     # =============================================================================
     # Section: Process alarm by namespace
     # =============================================================================    
-    
+
+    namespace_defined = True   
+
     if namespace == "AWS/EC2":
         response = ec2_handler.process_ec2(dimensions, region, account_id, namespace, change_time, annotation_time, start_time, end_time, start, end)
 
@@ -370,26 +271,7 @@ def alarm_handler(event, context):
     MetricData = metric_name + " - Metric Data: " + str(response)
     
     # Alarm History
-    try:
-        response = cloudwatch.describe_alarm_history(
-            AlarmName=alarm_name,
-            HistoryItemType='StateUpdate',
-            MaxRecords=100,
-            ScanBy='TimestampDescending'
-         )    
-    except botocore.exceptions.ClientError as error:
-        logger.exception("Error getting alarm history data")
-        raise RuntimeError("Unable to fullfil request") from error  
-    except botocore.exceptions.ParamValidationError as error:
-        raise ValueError('The parameters you provided are incorrect: {}'.format(error))      
-    logger.info("Alarm History" , extra=response)
-
-    for AlarmHistoryItem in response.get('AlarmHistoryItems', []):
-        AlarmHistoryItem.pop('AlarmName', None)
-        AlarmHistoryItem.pop('AlarmType', None)
-        AlarmHistoryItem.pop('HistoryData', None)
-        AlarmHistoryItem.pop('HistoryItemType', None) 
-    alarm_history = str(response)
+    alarm_history = get_alarm_history(region, alarm_name)
 
     # AWS Health
     restart_workflow = True
@@ -550,6 +432,16 @@ def alarm_handler(event, context):
 
                 # ----- TRYING truncating values   
 
+                from datetime import date
+                from collections import OrderedDict
+                from cfn_flip import to_json
+
+                class CustomJSONEncoder(json.JSONEncoder):
+                    def default(self, obj):
+                        if isinstance(obj, date):
+                            return obj.isoformat()
+                        return super().default(obj)
+
                 def remove_comments(template_str):
                     if template_str.strip().startswith('{'):
                         # JSON template
@@ -577,14 +469,11 @@ def alarm_handler(event, context):
 
                 def process_template(template_str, max_length):
                     try:
-                        # Try to load the template as YAML
-                        template_obj = yaml.safe_load(template_str)
-                    except yaml.YAMLError:
-                        try:
-                            # Try to load the template as JSON
-                            template_obj = json.loads(template_str)
-                        except json.JSONDecodeError:
-                            return "Invalid template format"
+                        # Convert the template to JSON using cfn-flip
+                        json_str = to_json(template_str)
+                        template_obj = json.loads(json_str, object_pairs_hook=OrderedDict)
+                    except Exception:
+                        return "Invalid template format"
 
                     # Remove comments from the template string
                     template_str = remove_comments(template_str)
@@ -592,14 +481,20 @@ def alarm_handler(event, context):
                     # Truncate values in the template object
                     truncated_obj = truncate_values(template_obj, max_length)
 
-                    return truncated_obj
+                    # Convert the Python object to JSON
+                    json_obj = json.loads(json.dumps(truncated_obj, cls=CustomJSONEncoder))
+
+                    # Minify the JSON object
+                    truncated_template_str = json.dumps(json_obj, separators=(',', ':'))
+
+                    return truncated_template_str
 
                 # Example use:
                 max_length = 50
                 preprocessed_template = process_template(cloudformation_template, max_length)
-                logger.info(preprocessed_template)    
-                print(len(cloudformation_template))       
-                print(len(preprocessed_template))              
+                logger.info(preprocessed_template)
+                print(len(cloudformation_template))
+                print(len(preprocessed_template))            
 
                 prompt += f'''
                 The CloudFormation template used to create this resource is in the <cloudformation_template> tag. 

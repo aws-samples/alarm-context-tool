@@ -3,3 +3,4 @@ boto3
 pandas
 dnspython
 PyYAML
+cfn_flip
