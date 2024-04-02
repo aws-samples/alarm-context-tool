@@ -24,9 +24,7 @@ import json
 import os
 import datetime
 import base64
-import yaml
 import botocore
-import re
 
 import sns_handler
 import ec2_handler
@@ -42,7 +40,6 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
 
-from functions import get_dashboard_button
 from functions import get_information_panel
 from functions import get_html_table
 from functions_metrics import generate_main_metric_widget
@@ -53,6 +50,7 @@ from functions_health import describe_events
 from functions_email import build_email_summary
 from functions_email import get_generic_links
 from functions_alarm import get_alarm_history
+from functions_cloudformation import get_cloudformation_template
 
 from  health_client import ActiveRegionHasChangedError
 
@@ -270,6 +268,7 @@ def alarm_handler(event, context):
 
     '''
     
+    """
     if not tags:  # This will be True if tags is None or an empty list
         logger.info("No tags found or 'Tags' is unassigned.")
     else:
@@ -462,7 +461,23 @@ def alarm_handler(event, context):
                 '''   
 
                 break  # Exit the loop once the desired tag is found    
+    """
 
+    # Process CloudFormation template and tags
+    max_length = 50 # Maximum length of CloudFormation Value to shorten prompt
+    preprocessed_template = get_cloudformation_template(tags, region, trace_summary, max_length)
+
+    if preprocessed_template:
+        # Build the prompt
+        prompt += f'''
+        The CloudFormation template used to create this resource is in the <cloudformation_template> tag.
+        Values have been truncated to {max_length}.
+        Use the cloudformation_template and if there is a fix that can be made, call it out and tell the reader which code they need to change to resolve the issue.
+        If this is identifiable, it will be the most important information that the reader will want to see.
+        <cloudformation_template>
+        {preprocessed_template}
+        </cloudformation_template>
+        '''
 
     if 'resource_information_object' in locals():
         prompt += f'''

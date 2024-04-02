@@ -394,6 +394,7 @@ def get_metric_array(trigger):
 
     return namespace, metric_name, statistic, dimensions, metrics_array
 
+@tracer.capture_method
 def get_metric_data(region, namespace, metric_name, dimensions, period, statistic, account_id, change_time, end_time):
     """
     Retrieves the metric data for the given parameters.
