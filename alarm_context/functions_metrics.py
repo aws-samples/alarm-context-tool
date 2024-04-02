@@ -1,4 +1,5 @@
 import boto3
+import botocore
 import json
 import datetime
 import re
@@ -392,3 +393,71 @@ def get_metric_array(trigger):
         raise ValueError("Required metric details not found in Alarm message")
 
     return namespace, metric_name, statistic, dimensions, metrics_array
+
+def get_metric_data(region, namespace, metric_name, dimensions, period, statistic, account_id, change_time, end_time):
+    """
+    Retrieves the metric data for the given parameters.
+    
+    Args:
+        region (str): The AWS region where the metric is located.
+        namespace (str): The namespace of the metric.
+        metric_name (str): The name of the metric.
+        dimensions (list): The dimensions of the metric.
+        period (int): The period of the metric data.
+        statistic (str): The statistic to use for the metric data.
+        account_id (str): The AWS account ID where the metric is located.
+        change_time (datetime): The time when the alarm state changed.
+        end_time (str): The end time for the metric data.
+    
+    Returns:
+        str: The metric data in string format.
+    """
+
+    logger.info("Dimensions", dimensions=dimensions)    
+    dimensions = [{"Name": dim["name"], "Value": dim["value"]} for dim in dimensions]
+    
+    metric_data_start = change_time + datetime.timedelta(minutes=-1500)
+    metric_data_start_time = metric_data_start.strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + metric_data_start.strftime('%z')
+    
+    cloudwatch = boto3.client('cloudwatch', region_name=region)
+    try:
+        response = cloudwatch.get_metric_data(
+            MetricDataQueries=[
+                {
+                    'Id': 'a1',
+                    'MetricStat': {
+                        'Metric': {
+                            'Namespace': namespace,
+                            'MetricName': metric_name,
+                            'Dimensions': dimensions
+                        },
+                        'Period': period,
+                        'Stat': statistic
+                    },
+                    'Label': 'string',
+                    'ReturnData': True,
+                    'AccountId': account_id
+                },
+            ],
+            StartTime=metric_data_start_time,
+            EndTime=end_time,
+        )    
+    except botocore.exceptions.ClientError as error:
+        logger.exception("Error getting metric data")
+        raise RuntimeError("Unable to fullfil request") from error  
+    except botocore.exceptions.ParamValidationError as error:
+        raise ValueError('The parameters you provided are incorrect: {}'.format(error))      
+    
+    # Enrich and clean the metric data results
+    for metric_data_result in response.get('MetricDataResults', []):
+        if 'Values' in metric_data_result:
+            metric_data_result['Values'] = [round(value, int(os.environ.get('METRIC_ROUNDING_PRECISION_FOR_BEDROCK'))) for value in metric_data_result['Values']]        
+        metric_data_result.pop('Timestamps', None)        
+
+    # Optionally remove 'Messages', 'ResponseMetadata', and 'RetryAttempts' from the response
+    response.pop('Messages', None)
+    response.pop('ResponseMetadata', None)
+    response.pop('RetryAttempts', None)    
+    
+    logger.info(metric_name +" - Metric Data: " + str(response))
+    return metric_name + " - Metric Data: " + str(response)    

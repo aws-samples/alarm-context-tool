@@ -46,6 +46,7 @@ from functions import get_dashboard_button
 from functions import get_information_panel
 from functions import get_html_table
 from functions_metrics import generate_main_metric_widget
+from functions_metrics import get_metric_data
 from functions import create_test_case
 from functions_metrics import get_metric_array
 from functions_health import describe_events
@@ -175,8 +176,8 @@ def alarm_handler(event, context):
     alarm_display.pop("Trigger", None)
     alarm_details = get_html_table("Alarm", alarm_display)
 
+    # Get Generic Links
     generic_information = get_generic_links(region)
-
     additional_information = generic_information
 
     if namespace_defined:
@@ -202,7 +203,7 @@ def alarm_handler(event, context):
             additional_information += resource_information  
 
       
-
+    ''' - NO LONGER USED
     """
     GreaterThanOrEqualToThreshold
     GreaterThanThreshold
@@ -217,65 +218,19 @@ def alarm_handler(event, context):
         comparison = "above"
     else:
         comparison = "below"  
+    '''
         
     # Get main widget    
     graph = generate_main_metric_widget(metrics_array, annotation_time, region, start_time, end_time)
     
-    logger.info("Dimensions", dimensions=dimensions)    
-    dimensions = [{"Name": dim["name"], "Value": dim["value"]} for dim in dimensions]
-    
-    metric_data_start = change_time + datetime.timedelta(minutes=-1500)
-    metric_data_start_time = metric_data_start.strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + metric_data_start.strftime('%z')
-    
-    cloudwatch = boto3.client('cloudwatch', region_name=region)
-    try:
-        response = cloudwatch.get_metric_data(
-            MetricDataQueries=[
-                {
-                    'Id': 'a1',
-                    'MetricStat': {
-                        'Metric': {
-                            'Namespace': namespace,
-                            'MetricName': metric_name,
-                            'Dimensions': dimensions
-                        },
-                        'Period': period,
-                        'Stat': statistic
-                    },
-                    'Label': 'string',
-                    'ReturnData': True,
-                    'AccountId': account_id
-                },
-            ],
-            StartTime=metric_data_start_time,
-            EndTime=end_time,
-        )    
-    except botocore.exceptions.ClientError as error:
-        logger.exception("Error getting metric data")
-        raise RuntimeError("Unable to fullfil request") from error  
-    except botocore.exceptions.ParamValidationError as error:
-        raise ValueError('The parameters you provided are incorrect: {}'.format(error))      
-    
-    # Enrich and clean the metric data results
-    for metric_data_result in response.get('MetricDataResults', []):
-        if 'Values' in metric_data_result:
-            metric_data_result['Values'] = [round(value, int(os.environ.get('METRIC_ROUNDING_PRECISION_FOR_BEDROCK'))) for value in metric_data_result['Values']]        
-        metric_data_result.pop('Timestamps', None)        
-
-    # Optionally remove 'Messages', 'ResponseMetadata', and 'RetryAttempts' from the response
-    response.pop('Messages', None)
-    response.pop('ResponseMetadata', None)
-    response.pop('RetryAttempts', None)    
-    
-    logger.info(metric_name +" - Metric Data: " + str(response))
-    MetricData = metric_name + " - Metric Data: " + str(response)
+    # Get metric data
+    metric_data = get_metric_data(region, namespace, metric_name, dimensions, period, statistic, account_id, change_time, end_time)
     
     # Alarm History
     alarm_history = get_alarm_history(region, alarm_name)
 
-    # AWS Health
+    # AWS Health - See https://github.com/aws/aws-health-tools/tree/master/high-availability-endpoint/python
     restart_workflow = True
-
     while restart_workflow:
         try:
             health_events = describe_events(region)
@@ -304,7 +259,7 @@ def alarm_handler(event, context):
     {message}
     </alarm>
     <metric>
-    {MetricData}
+    {metric_data}
     </metric>
     <summary>
     {text_summary}
