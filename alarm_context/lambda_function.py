@@ -16,7 +16,7 @@
 
 # TO DO
 # x-ray still needs some debugging - DONE
-# update test case function
+# update test case function - DONE, COULD IMPROVE
 # AWS Health - DONE
 
 import boto3
@@ -48,6 +48,9 @@ from functions_metrics import get_metric_array
 from functions_health import describe_events
 from functions_email import build_email_summary
 from functions_email import get_generic_links
+from functions_email import send_email
+from functions_email import build_html_body
+
 from functions_alarm import get_alarm_history
 from functions_cloudformation import get_cloudformation_template
 from functions_bedrock import construct_prompt
@@ -78,7 +81,6 @@ def alarm_handler(event, context):
     # =============================================================================
 
     message = json.loads(event['Records'][0]['Sns']['Message'])    
-    runtime_region = os.environ['AWS_REGION']
     alarm_name = message['AlarmName']
     alarm_description = message['AlarmDescription']
     new_state = message['NewStateValue']
@@ -200,24 +202,6 @@ def alarm_handler(event, context):
             additional_information += log_information
         if resource_information is not None: 
             additional_information += resource_information  
-
-      
-    ''' - NO LONGER USED
-    """
-    GreaterThanOrEqualToThreshold
-    GreaterThanThreshold
-    LessThanThreshold
-    LessThanOrEqualToThreshold
-    LessThanLowerOrGreaterThanUpperThreshold
-    LessThanLowerThreshold
-    GreaterThanUpperThreshold
-    """
-	# Comparison for get_metric_widget
-    if message['Trigger']['ComparisonOperator'].startswith("GreaterThan"):
-        comparison = "above"
-    else:
-        c = "below"  
-    '''
         
     # Get main widget    
     graph = generate_main_metric_widget(metrics_array, annotation_time, region, start_time, end_time)
@@ -248,159 +232,39 @@ def alarm_handler(event, context):
     # Execute Bedrock Prompt
     ai_response = execute_prompt(prompt)
 
+    # =============================================================================
+    # Section: Create attachments
+    # =============================================================================
+
     sender = os.environ.get('SENDER')
     recipient = os.environ.get('RECIPIENT')
-
     subject = "ALARM: " + alarm_name
-    BODY_TEXT = text_summary
-    
-    # The HTML body of the email.
-    BODY_HTML = """
-    <!DOCTYPE htmlPUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-    <html xmlns="http://www.w3.org/1999/xhtml" lang="en">
-        <head>
-            <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-            <meta http-equiv="X-UA-Compatible" content="IE=edge">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            </style>            
-            <title>%s</title>
-        </head>
-        <body>
-            <center>
-                <table style="word-wrap: break-all; width:100%%;max-width:640px;margin: 0 auto;" width="100%%" width="640" cellpadding="0" cellspacing="0" border="0">
-                    <tr><td></td><td width="640" style="max-width:640px; padding:9px; color: rgb(255, 255, 255) !important; -webkit-text-fill-color: rgb(255, 255, 255) !important; margin-bottom:10px; text-align:left; background: rgb(35,47,62); background: linear-gradient(135deg, rgba(35,47,62,1) 0%%, rgba(0,49,129,1) 25%%, rgba(0,49,129,1) 50%%, rgba(32,116,213,1) 90%%, rgba(255,153,0,1) 100%%);">%s</td><td></td></tr>
-                    <tr><td></td><td width="100%%" style="text-align:left; line-height: 10px;">&nbsp;</td><td></td></tr>                    
-                    <tr><td></td><td width="640" style="max-width:640px; text-align:left;">%s</td><td></td></tr>
-                    <tr><td></td><td width="640" style="max-width:640px; text-align:left;">%s</td><td></td></tr>
-                    <tr><td></td><td width="640" style="max-width:640px; text-align:left; background-color: #ffffff; background-image: linear-gradient(#ffffff,#ffffff);"><center><img style="margin-bottom:10px;" src="cid:imageId"></center></td><td></td></tr>
-    """ % (subject, subject, summary, ai_response)
-    
-    if 'widget_images' in locals():
-        i = 0
-        BODY_HTML += '<tr><td></td><td width="100%%" style="max-width: 640px !important; text-align:left; background-color: #ffffff; background-image: linear-gradient(#ffffff,#ffffff);">'
-        BODY_HTML += '<center><table style="max-width: 640px !important;" width="640"><tr>'
-        for widget_image in widget_images:
-            if i % 2 == 0:
-                BODY_HTML += '</tr><tr>';
-            i += 1
-            if isinstance(widget_image['data'], bytes):
-                BODY_HTML += '<td style="max-width: 320px !important;" width="320"><img style="margin-bottom:10px;" src="cid:%s"></td>' % (widget_image["widget"].replace(" ", "_"))
-            elif type(widget_image['data']) == str:
-                BODY_HTML += '<td valign="top" style="vertical-align-top; max-width: 320px !important;" width="320">%s</td>' % (widget_image["data"])
-        BODY_HTML += '</tr></table></center>'
-        BODY_HTML += '</td><td></td></tr>' 
-        
-    if 'trace_html' in locals():
-        BODY_HTML += """   
-                        <tr><td></td><td width="100%%" style="text-align:left; line-height: 10px;">&nbsp;</td><td></td></tr>
-                        <tr><td></td><td width="640" style="text-align:left;">%s</td><td></td></tr>  
-                        <tr><td></td><td width="100%%" style="text-align:left; line-height: 10px;">&nbsp;</td><td></td></tr>
-        """ % (trace_html)
-    
-    BODY_HTML += """   
-                    <tr><td></td><td width="100%%" style="text-align:left; line-height: 10px;">&nbsp;</td><td></td></tr>
-                    <tr><td></td><td width="640" style="text-align:left;">
-                    <table cellpadding="0" cellspacing="0" border="0" style="padding:0px;margin:0px;width:100%%;">
-                        <tr><td colspan="3" style="padding:0px;margin:0px;font-size:20px;height:20px;" height="20">&nbsp;</td></tr>
-                        <tr>
-                            <td style="padding:0px;margin:0px;">&nbsp;</td>
-                            <td style="padding:0px;margin:0px;" width="640">%s</td>
-                            <td style="padding:0px;margin:0px;">&nbsp;</td>
-                        </tr>
-                        <tr><td colspan="3" style="padding:0px;margin:0px;max-width: 640px !important;" height="20">&nbsp;</td></tr>
-                    </table>
-                    </td><td></td></tr> 
-                    <tr><td></td><td width="100%%" style="text-align:left; line-height: 10px;">&nbsp;</td><td></td></tr>
-                    <tr><td></td><td width="640" style="text-align:left;">%s</td><td></td></tr>  
-                    <tr><td></td><td width="100%%" style="text-align:left; line-height: 10px;">&nbsp;</td><td></td></tr>
-                    <tr><td></td><td width="640" style="text-align:left;">%s</td><td></td></tr>
-                </table>
-            </center>
-        </body>
-    </html>                    
-    """ % (additional_information, alarm_details, metric_details)
-    
+    BODY_TEXT = text_summary    
 
-    CHARSET = "utf-8"
-    
-    # Create a multipart/mixed parent container.
-    msg = MIMEMultipart('mixed')
-    # Add subject, from and to lines.
-    msg['Subject'] = subject 
-    msg['From'] = sender 
-    msg['To'] = recipient
-    
-    # Create a multipart/alternative child container.
-    msg_body = MIMEMultipart('alternative')
-    
-    # Encode the text and HTML content and set the character encoding. This step is
-    # necessary if you're sending a message with characters outside the ASCII range.
-    textpart = MIMEText(BODY_TEXT.encode(CHARSET), 'plain', CHARSET)
-    htmlpart = MIMEText(BODY_HTML.encode(CHARSET), 'html', CHARSET)
-    
-    # Add the text and HTML parts to the child container.
-    msg_body.attach(textpart)
-    msg_body.attach(htmlpart)
-    
+    # Deal with attachments    
+    attachments = []
+
     # Base64 Link Icon
-    link_icon = b'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAj0lEQVQ4ja2SwQ3CMBAEx6kgedIFbVAHaZIeQhmEdLF8LshEd9YZWGllS/aMbclIukha5QdrmCJpBU74KTYqWGeo4OKUw9oE3D8MznWjjpIW27vUUEZwhKcegQeTFURwStCC340EKbgluCXg5hPOJglP3qEiSdVn6Yn2n/hT/iJ42lydBdgGYAa2Lw5/ANcX9a8GnTGB0iAAAAAASUVORK5CYII='
-    
-    with open('/tmp/link_icon.png', 'wb') as fout:
-        fout.write(base64.b64decode(link_icon))
-    LINK_ICON_ATTACHMENT = "/tmp/link_icon.png"      
-    # Define the attachment part and encode it using MIMEApplication.
-    att = MIMEApplication(open(LINK_ICON_ATTACHMENT, 'rb').read())
-    
-    # Add a header to tell the email client to treat this part as an attachment,
-    # and to give the attachment a name.
-    att.add_header('Content-Disposition','attachment',filename=os.path.basename(LINK_ICON_ATTACHMENT))
-    att.add_header('Content-ID', '<imageId2>')  
-    msg.attach(att)
-    
-    with open('/tmp/image.png', 'wb') as fout:
-        fout.write(graph)
-    ATTACHMENT = "/tmp/image.png"     
-    
-    # Define the attachment part and encode it using MIMEApplication.
-    att = MIMEApplication(open(ATTACHMENT, 'rb').read())
-    att.add_header('Content-Disposition','attachment',filename=os.path.basename(ATTACHMENT))
-    att.add_header('Content-ID', '<imageId>')
-    msg.attach(att) 
+    link_icon_data = base64.b64decode(b'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAj0lEQVQ4ja2SwQ3CMBAEx6kgedIFbVAHaZIeQhmEdLF8LshEd9YZWGllS/aMbclIukha5QdrmCJpBU74KTYqWGeo4OKUw9oE3D8MznWjjpIW27vUUEZwhKcegQeTFURwStCC340EKbgluCXg5hPOJglP3qEiSdVn6Yn2n/hT/iJ42lydBdgGYAa2Lw5/ANcX9a8GnTGB0iAAAAAASUVORK5CYII=')
+    attachments.append({"filename": "link_icon.png", "data": link_icon_data, "id": "<imageId2>"})
 
-    if 'widget_images' in locals():    
-        for widget_image in widget_images:
-            if isinstance(widget_image['data'], bytes):
-                with open(f'/tmp/{widget_image["widget"].replace(" ", "_")}.png', 'wb') as fout:
-                    fout.write(widget_image['data'])
-                ATTACHMENT = f'/tmp/{widget_image["widget"].replace(" ", "_")}.png'
-                image = MIMEApplication(open(ATTACHMENT, 'rb').read())
-                image.add_header('Content-Disposition', 'attachment', filename=f'{widget_image["widget"].replace(" ", "_")}.png')
-                image.add_header('Content-ID', f'<{widget_image["widget"].replace(" ", "_")}>')
-                msg.attach(image)    
+    # Main Widget Graph
+    attachments.append({"filename": "main_widget_graph.png", "data": graph, "id": "<imageId>"})
+
+    # Widget Images
+    for widget_image in widget_images:
+        filename = f'{widget_image["widget"].replace(" ", "_")}.png'
+        content_id = f'<{widget_image["widget"].replace(" ", "_")}>'
+        attachments.append({"filename": filename, "data": widget_image['data'], "id": content_id})
     
+    # Get HTML
+    BODY_HTML = build_html_body(subject, summary, ai_response, widget_images, trace_html, additional_information, alarm_details, metric_details)
     
-    # Attach the multipart/alternative child container to the multipart/mixed
-    # parent container.
-    msg.attach(msg_body)
-    
-    ses = boto3.client('ses',region_name=runtime_region)
-    try:
-        logger.info("Sending Email")
-        # Provide the contents of the email.
-        response = ses.send_raw_email(
-            Source=sender,
-            Destinations=[
-                recipient
-            ],
-            RawMessage={
-                'Data':msg.as_string(),
-            }
-        )
-    # Display an error if something goes wrong.	
-    except botocore.exceptions.ClientError as error:
-        logger.exception("Error sending email")
-        raise RuntimeError("Unable to fullfil request") from error  
-    except botocore.exceptions.ParamValidationError as error:
-        raise ValueError('The parameters you provided are incorrect: {}'.format(error))       
-    else:
-        logger.info("Email Sent", message_id=response['MessageId'])
+    send_email(
+        sender=sender,
+        recipient=recipient,
+        subject=subject,
+        body_text=BODY_TEXT,
+        body_html=BODY_HTML,
+        attachments=attachments
+    )    
