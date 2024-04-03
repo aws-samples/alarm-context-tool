@@ -37,6 +37,7 @@ Resources:
           POWERTOOLS_LOG_LEVEL: INFO
           POWERTOOLS_LOGGER_LOG_EVENT: "True"
           POWERTOOLS_SERVICE_NAME: Alarm
+          POWERTOOLS_TRACER_CAPTURE_RESPONSE: "False"
           RECIPIENT: aliving@amazon.com
           SENDER: Alex Livingstone <aliving@amazon.com>
           USE_BEDROCK: "True"          
