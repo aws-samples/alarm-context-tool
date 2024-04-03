@@ -250,8 +250,8 @@ def process_lambda(metric_name, dimensions, region, account_id, namespace, chang
         notifications = None
     return {
         "contextual_links": contextual_links,
-        "log_information": None,
-        "log_events": None,
+        "log_information": log_information,
+        "log_events": log_events,
         "resource_information": None,
         "resource_information_object": None,
         "notifications": None,

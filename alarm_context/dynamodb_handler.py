@@ -1,6 +1,5 @@
 import boto3
 import botocore
-from datetime import datetime, timedelta
 
 from functions import get_dashboard_button
 from functions import get_html_table

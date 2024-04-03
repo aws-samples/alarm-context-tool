@@ -126,6 +126,7 @@ def alarm_handler(event, context):
     # =============================================================================    
 
     namespace_defined = True   
+    logger.info(dimensions) 
 
     if namespace == "AWS/EC2":
         response = ec2_handler.process_ec2(dimensions, region, account_id, namespace, change_time, annotation_time, start_time, end_time, start, end)
@@ -152,7 +153,7 @@ def alarm_handler(event, context):
         response = application_elb_handler.process_application_elb(dimensions, region, account_id, namespace, change_time, annotation_time, start_time, end_time, start, end) 
         
     elif namespace == "AWS/ApiGateway":
-        additional_information, log_information, additional_summary, widget_images, id = api_gateway.process_api_gateway(message, region, account_id, namespace, change_time, annotation_time, start_time, end_time, start, end)
+        response = api_gateway.process_api_gateway(dimensions, region, account_id, namespace, change_time, annotation_time, start_time, end_time, start, end) 
 
     else:
         # Namespace not matched
@@ -252,10 +253,11 @@ def alarm_handler(event, context):
     attachments.append({"filename": "main_widget_graph.png", "data": graph, "id": "<imageId>"})
 
     # Widget Images
-    for widget_image in widget_images:
-        filename = f'{widget_image["widget"].replace(" ", "_")}.png'
-        content_id = f'<{widget_image["widget"].replace(" ", "_")}>'
-        attachments.append({"filename": filename, "data": widget_image['data'], "id": content_id})
+    if widget_images:
+        for widget_image in widget_images:
+            filename = f'{widget_image["widget"].replace(" ", "_")}.png'
+            content_id = f'<{widget_image["widget"].replace(" ", "_")}>'
+            attachments.append({"filename": filename, "data": widget_image['data'], "id": content_id})
     
     # Get HTML
     BODY_HTML = build_html_body(subject, summary, ai_response, widget_images, trace_html, additional_information, alarm_details, metric_details)

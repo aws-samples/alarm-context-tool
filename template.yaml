@@ -86,6 +86,14 @@ Resources:
               Action:
                 - bedrock:InvokeModel
               Resource: arn:*:bedrock:*::foundation-model/*
+            - Effect: Allow
+              Action: 
+                - apigateway:GET
+              Resource:
+                - arn:aws:apigateway:*::/apis/*/stages
+                - arn:aws:apigateway:*::/apis/*/stages/*                
+                - arn:aws:apigateway:us-east-1::/restapis
+                - arn:aws:apigateway:us-east-1::/restapis/*           
       Tracing: Active
       LoggingConfig:
         LogFormat: JSON 

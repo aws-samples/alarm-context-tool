@@ -147,32 +147,46 @@ class CustomJSONEncoder(json.JSONEncoder):
             return obj.isoformat()
         return super().default(obj)
 
-def get_cloudformation_template(tags, region, trace_summary, max_length=100):
-    preprocessed_template = None
-    prompt_data = None
+@tracer.capture_method
+def find_cloudformation_arn(tags):
+    cloudformation_arn = None
 
-    if not tags:
-        logger.info("No tags found or 'Tags' is unassigned.")
-    else:
+    if isinstance(tags, list):
         for tag in tags:
             if tag['Value'].startswith('arn:aws:cloudformation:'):
                 cloudformation_arn = tag['Value']
-                cloudformation = boto3.client('cloudformation', region_name=region)
+                break  # Exit the loop once found
 
-                try:
-                    response = cloudformation.get_template(
-                        StackName=cloudformation_arn,
-                        TemplateStage='Processed'
-                    )
-                except botocore.exceptions.ClientError as error:
-                    logger.exception("Error getting CloudFormation template")
-                    raise RuntimeError("Unable to fullfil request") from error
-                except botocore.exceptions.ParamValidationError as error:
-                    raise ValueError('The parameters you provided are incorrect: {}'.format(error))
+    elif isinstance(tags, dict):
+        for key, value in tags.items():
+            if value.startswith('arn:aws:cloudformation:'):
+                cloudformation_arn = value
+                break  # Exit the loop once found
 
-                cloudformation_template = response['TemplateBody']
-                preprocessed_template = process_cloudformation_template(cloudformation_template, trace_summary, max_length)
+    return cloudformation_arn
 
-                break  # Exit the loop once the desired tag is found
+@tracer.capture_method
+def get_cloudformation_template(tags, region, trace_summary, max_length=100):
+    preprocessed_template = None
+
+    if not tags:
+        logger.info("No tags found or 'Tags' is unassigned.")
+    else:        
+        cloudformation_arn = find_cloudformation_arn(tags)
+        if cloudformation_arn:
+            cloudformation = boto3.client('cloudformation', region_name=region)
+            try:
+                response = cloudformation.get_template(
+                    StackName=cloudformation_arn,
+                    TemplateStage='Processed'
+                )
+            except botocore.exceptions.ClientError as error:
+                logger.exception("Error getting CloudFormation template")
+                raise RuntimeError("Unable to fullfil request") from error
+            except botocore.exceptions.ParamValidationError as error:
+                raise ValueError('The parameters you provided are incorrect: {}'.format(error))
+
+            cloudformation_template = response['TemplateBody']
+            preprocessed_template = process_cloudformation_template(cloudformation_template, trace_summary, max_length)
 
     return preprocessed_template
