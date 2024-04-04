@@ -88,7 +88,7 @@ def alarm_handler(event, context):
     state_change_time = message['StateChangeTime']
     alarm_arn = message['AlarmArn']
     region_name = message['Region']
-    period = message['Trigger']['Period']    
+    period = message['Trigger']['Period'] 
 
     # Get array of metrics and variables for first metric
     namespace, metric_name, statistic, dimensions, metrics_array = get_metric_array(message['Trigger'])
@@ -158,9 +158,18 @@ def alarm_handler(event, context):
     else:
         # Namespace not matched
         # TO DO: use describe-metric-filters to see if this is a metric filter metric and then get log data.
-        additional_information = ''
+        contextual_links = None
+        log_information = None
+        log_events = None
+        resource_information = None
+        resource_information_object = None
+        widget_images = None
+        additional_metrics_with_timestamps_removed = None
+        trace_summary = None
+        trace_html = None
+        notifications = None    
+        tags = None        
         namespace_defined = False
-        additional_metrics_with_timestamps_removed = ''
         logger.info("undefined_namespace_dimensions", extra={"namespace": namespace})         
 
     # =============================================================================
@@ -223,8 +232,11 @@ def alarm_handler(event, context):
             logger.info("The AWS Health API active region has changed. Restarting the workflow using the new active region!, %s", are)
 
     # Get truncated CloudFormation template
-    max_length = 50 # Maximum length of CloudFormation Value to shorten prompt
-    truncated_cloudformation_template = get_cloudformation_template(tags, region, trace_summary, max_length)
+    if tags:
+        max_length = 50 # Maximum length of CloudFormation Value to shorten prompt
+        truncated_cloudformation_template = get_cloudformation_template(tags, region, trace_summary, max_length)
+    else:
+        truncated_cloudformation_template = None
 
     # Contruct Bedrock prompt
     prompt = construct_prompt(alarm_history, message, metric_data, text_summary, health_events, truncated_cloudformation_template, resource_information_object, log_events, additional_metrics_with_timestamps_removed, trace_summary)

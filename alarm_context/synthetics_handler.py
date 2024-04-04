@@ -206,14 +206,18 @@ def process_synthetics(dimensions, region, account_id, namespace, change_time, a
             # Adjust the start and end times to include a 5-minute buffer
             trace_start_time = original_start_time - timedelta(minutes=5)
             trace_end_time = original_end_time + timedelta(minutes=5)
-            
+
+            # Format datetime objects into strings for logging or API calls
+            trace_start_time_str = trace_start_time.strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'  # Example formatting
+            trace_end_time_str = trace_end_time.strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'  # Example formatting
+
             # Canary run ID
             canary_run_id = selected_run['Id']
             
             # Define the X-ray filter expression using the canary run ID
             filter_expression = f'annotation.aws:canary_run_id = "{canary_run_id}" and responsetime > 0'
             logger.info("X-Ray Filter Expression", filter_expression=filter_expression)            
-            trace_summary, trace = process_traces(filter_expression, region, trace_start_time, trace_end_time)
+            trace_summary, trace = process_traces(filter_expression, region, trace_start_time_str, trace_end_time_str)
 
         else:
             contextual_links = None
