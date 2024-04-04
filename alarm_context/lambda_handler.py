@@ -237,6 +237,12 @@ def process_lambda(metric_name, dimensions, region, account_id, namespace, chang
         ]
         widget_images = build_dashboard(dashboard_metrics, annotation_time, start, end, region) 
         additional_metrics_with_timestamps_removed = get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, region)     
+        log_information = None
+        log_events = None        
+        trace_summary = None
+        trace = None        
+        resource_information = None
+        resource_information_object = None        
     else:
         contextual_links = None
         log_information = None
