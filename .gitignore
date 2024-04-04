@@ -215,6 +215,7 @@ venv.bak/
 !.vscode/launch.json
 !.vscode/extensions.json
 .history
+.VSCodeCounter/*
 
 ### Windows ###
 # Windows thumbnail cache files
@@ -240,5 +241,8 @@ $RECYCLE.BIN/
 # Build folder
 
 */build/*
+
+# AWS SAM
+.aws-sam/*
 
 # End of https://www.gitignore.io/api/osx,linux,python,windows,pycharm,visualstudiocode

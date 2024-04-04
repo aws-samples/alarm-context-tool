@@ -38,17 +38,26 @@ def process_traces(filter_expression, region, trace_start_time, trace_end_time):
         raise RuntimeError("Unable to fullfil request") from error  
     except botocore.exceptions.ParamValidationError as error:
         raise ValueError('The parameters you provided are incorrect: {}'.format(error))
-    
+
     # Log the trace ID
     for trace_summary in response.get('TraceSummaries', []):
         logger.info("Trace ID", trace_summary_id=trace_summary.get('Id'))
 
     # Log the response as a JSON string on one line
-    logger.info("Trace Summary", extra=response)        
+    MAX_TRACE_SUMMARIES = 3
+    limited_trace_summaries = response.get('TraceSummaries', [])[:MAX_TRACE_SUMMARIES]
 
-    response_json = json.dumps(response, default=json_serial)
-    trace_summary = ''.join(response_json.split())
-    trace_summary = response
+    trace_summary = {
+        "TraceSummaries": limited_trace_summaries,
+        # Include other keys from the original response if necessary
+        # "UnprocessedTraceIds": response.get("UnprocessedTraceIds", []),
+        # "NextToken": response.get("NextToken", None),
+        # "ApproximateTime": response.get("ApproximateTime", None),
+        # "TracesProcessedCount": len(limited_trace_summaries),
+    }
+
+    logger.info("Trace Summary", extra=trace_summary)        
+    
 
     # Create a table containing the resources in the trace
     # Initialize list for combined data
