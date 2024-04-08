@@ -18,34 +18,6 @@ def json_serial(obj):
 
 @tracer.capture_method
 def create_test_case(event):
-    '''
-    message = event['Records'][0]['Sns']['Message']
-    message_json = json.loads(message)
-    yesterday = datetime.datetime.now() - datetime.timedelta(days=1)
-    yesterday_str = yesterday.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
-    test_case = {
-        "Records": [
-            {
-                "EventSource": "aws:sns",
-                "EventVersion": "1.0",
-                "EventSubscriptionArn": "arn:aws:sns:us-east-2:180304385487:films-NotificationTopic-1VEIMAWNYHAUO:b0c7154b-3c0f-4fd3-b00a-a6c0c27e0003",
-                "Sns": {
-                    "Type": "Notification",
-                    "MessageId": "b16dc7a7-4644-59b2-9a39-9cc30c5349b5",
-                    "TopicArn": "arn:aws:sns:us-east-2:180304385487:films-NotificationTopic-1VEIMAWNYHAUO",
-                    "Subject": "ALARM: \"ELB Target Response Time > 0.4s\" in US East (Ohio)",
-                    "Message": json.dumps(message_json),
-                    "Timestamp": yesterday_str,
-                    "SignatureVersion": "1",
-                    "Signature": "KvJ1jz5fdJCdlhzjC6bcUrn/bHa/lSEj+EpyPexGQGUZIP5WrT58XGxkPS/XL8ouFD41gBykWLLaZ4ZOwy4SHFAEVYRLyH2hK7fv4DPnxY1e+i7j3DsHtNXmh/CnsxF1oiT3vlU6102UXp2UYtQ4iQJiWEZiy11Ia26GU9oeXn48aeDX6UKCIJT5kcafyc/8RSsqPsc8ZOfBwtmJFwaCnBZeSW5T1D6E6zd9u0avED5IKIdYy2wiwkwG3JjKiSg/Yb2EWjkpjaxolMYRsb2yN1GSxz0FKw1Y0DaJZsrVLlERttXOSCgqvbsjGTiA/Qalp2pYa5gRkVEOu27vyBFvpQ==",
-                    "SigningCertUrl": "https://sns.us-east-2.amazonaws.com/SimpleNotificationService-56e67fcb41f6fec09b0196692625d385.pem",
-                    "UnsubscribeUrl": "https://sns.us-east-2.amazonaws.com/?Action=Unsubscribe&SubscriptionArn=arn:aws:sns:us-east-2:180304385487:films-NotificationTopic-1VEIMAWNYHAUO:b0c7154b-3c0f-4fd3-b00a-a6c0c27e0003",
-                    "MessageAttributes": {}
-                }
-            }
-        ]
-    }
-    '''
     # Extract the relevant SNS message part of the event
     sns_message = event['Records'][0]['Sns']
     

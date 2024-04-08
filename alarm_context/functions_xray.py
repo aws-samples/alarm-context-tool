@@ -67,13 +67,16 @@ def process_traces(filter_expression, region, trace_start_time, trace_end_time):
     for summary in response["TraceSummaries"]:
         instance_ids = [instance["Id"] for instance in summary.get("InstanceIds", [])]
         for service in summary["ServiceIds"]:
+            service_name = service.get("Name", "Unknown")
+            service_type = service.get("Type", "Unknown")  # Provide a default value for 'Type' if it's missing
+
             # Special treatment for EC2 instance types
-            if service["Type"] == "AWS::EC2::Instance":
+            if service_type == "AWS::EC2::Instance":
                 for instance_id in instance_ids:
-                    combined_data.append({"Name": service["Name"], "Type": service["Type"], "InstanceId": instance_id})
+                    combined_data.append({"Name": service_name, "Type": service_type, "InstanceId": instance_id})
             else:
                 # General treatment for all other service types
-                combined_data.append({"Name": service["Name"], "Type": service["Type"], "InstanceId": None})
+                combined_data.append({"Name": service_name, "Type": service_type, "InstanceId": None})
     
     # Process the data
     df_combined = pd.DataFrame(combined_data).drop_duplicates().reset_index(drop=True)
