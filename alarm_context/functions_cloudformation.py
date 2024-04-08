@@ -63,23 +63,8 @@ def get_root_cause_service_types(root_causes):
     return root_cause_types
 
 @tracer.capture_method
-def filter_resources_from_template(template_body, root_cause_types):
-    # Determine if the template is JSON or YAML and parse accordingly
-    try:
-        template_dict = json.loads(template_body)
-        format_used = 'json'
-    except json.JSONDecodeError:
-        def yaml_loader_with_custom_tags(loader, tag_suffix, node):
-            return node.value
-
-        # Register custom tag handlers
-        yaml.SafeLoader.add_multi_constructor('!', yaml_loader_with_custom_tags)
-
-        try:
-            template_dict = yaml.safe_load(template_body)
-            format_used = 'yaml'
-        except yaml.YAMLError:
-            return {}
+def filter_resources_from_template(template_str, root_cause_types):
+    template_dict = json.loads(template_str)
 
     # Filter resources
     filtered_resources = {}
@@ -92,15 +77,7 @@ def filter_resources_from_template(template_body, root_cause_types):
 
 @tracer.capture_method
 def truncate_template(template_str, max_length):
-    try:
-        # Convert the template to JSON using cfn-flip
-        json_str = to_json(template_str)
-        template_obj = json.loads(json_str, object_pairs_hook=OrderedDict)
-    except Exception:
-        return "Invalid template format"
-
-    # Remove comments from the template string
-    template_str = remove_comments(template_str)
+    template_obj = json.loads(template_str, object_pairs_hook=OrderedDict)
 
     # Truncate values in the template object
     truncated_obj = truncate_values(template_obj, max_length)
@@ -112,6 +89,7 @@ def truncate_template(template_str, max_length):
     truncated_template_str = json.dumps(json_obj, separators=(',', ':'))
 
     return truncated_template_str
+
 
 @tracer.capture_method
 def remove_comments(template_str):
@@ -171,22 +149,32 @@ def get_cloudformation_template(tags, region, trace_summary, max_length=100):
 
     if not tags:
         logger.info("No tags found or 'Tags' is unassigned.")
-    else:        
-        cloudformation_arn = find_cloudformation_arn(tags)
-        if cloudformation_arn:
-            cloudformation = boto3.client('cloudformation', region_name=region)
-            try:
-                response = cloudformation.get_template(
-                    StackName=cloudformation_arn,
-                    TemplateStage='Processed'
-                )
-            except botocore.exceptions.ClientError as error:
-                logger.exception("Error getting CloudFormation template")
-                raise RuntimeError("Unable to fullfil request") from error
-            except botocore.exceptions.ParamValidationError as error:
-                raise ValueError('The parameters you provided are incorrect: {}'.format(error))
 
-            cloudformation_template = response['TemplateBody']
-            preprocessed_template = process_cloudformation_template(cloudformation_template, trace_summary, max_length)
+    cloudformation_arn = find_cloudformation_arn(tags)
+
+    if cloudformation_arn:      
+        cloudformation = boto3.client('cloudformation', region_name=region)
+        try:
+            response = cloudformation.get_template(
+                StackName=cloudformation_arn,
+                TemplateStage='Processed'
+            )
+        except botocore.exceptions.ClientError as error:
+            logger.exception("Error getting CloudFormation template")
+            raise RuntimeError("Unable to fullfil request") from error
+        except botocore.exceptions.ParamValidationError as error:
+            raise ValueError('The parameters you provided are incorrect: {}'.format(error))
+        
+        cloudformation_template = response['TemplateBody']
+        logger.info ("Cloudformation Template", extra=response)                 
+
+        try:
+            # Attempt to treat the string as YAML and convert to JSON
+            cloudformation_template = to_json(cloudformation_template)
+        except Exception as e:
+            # The template is in JSON, conver to string
+            cloudformation_template = json.dumps(cloudformation_template)
+            
+        preprocessed_template = process_cloudformation_template(cloudformation_template, trace_summary, max_length)
 
     return preprocessed_template

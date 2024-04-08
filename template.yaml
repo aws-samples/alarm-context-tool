@@ -83,7 +83,8 @@ Resources:
                 - ssm:ListCommands     
                 - health:DescribeEvents
                 - health:DescribeEventDetails    
-                - cloudformation:GetTemplate      
+                - cloudformation:GetTemplate    
+                - rds:DescribeDBClusters  
               Resource: "*"
             - Effect: Allow
               Action:
