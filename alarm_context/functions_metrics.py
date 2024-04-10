@@ -245,6 +245,7 @@ def get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, regi
                     'Id': metric_id,
                     'Expression': expression,
                     'Label': label,
+                    'Period': widget["period"],
                     'ReturnData': True
                 }
             else:

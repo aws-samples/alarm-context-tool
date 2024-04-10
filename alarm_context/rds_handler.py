@@ -8,6 +8,7 @@ from functions_logs import get_log_insights_link
 from functions_xray import process_traces
 from functions_metrics import build_dashboard
 from functions_metrics import get_metrics_from_dashboard_metrics
+from functions import get_information_panel
 
 from aws_lambda_powertools import Logger
 from aws_lambda_powertools import Tracer
@@ -28,6 +29,7 @@ def process_rds(metric_name, dimensions, region, account_id, namespace, change_t
     resource_information_object = {}
     widget_images = []
     additional_metrics_with_timestamps_removed = []
+    notifications = ""
 
     if dimensions:
         dimension_values = {element['name']: element['value'] for element in dimensions}
@@ -75,38 +77,15 @@ def process_rds(metric_name, dimensions, region, account_id, namespace, change_t
             ]  
             widget_images.extend(build_dashboard(dashboard_metrics, annotation_time, start, end, region))
             additional_metrics_with_timestamps_removed.extend(get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, region))  
-
-            # Describe Cluster
-            rds = boto3.client('rds', region_name=region)  
-            try:
-                response = rds.describe_db_clusters(DBClusterIdentifier=db_cluster_identifier)   
-            except botocore.exceptions.ClientError as error:
-                logger.exception("Error describing RDS Clusters")
-                raise RuntimeError("Unable to fullfil request") from error  
-            except botocore.exceptions.ParamValidationError as error:
-                raise ValueError('The parameters you provided are incorrect: {}'.format(error)) 
-
-            # Performance Insights
-            if response['DBClusters'][0]['PerformanceInsightsEnabled']:
-                logger.info("Performance Insights is Enabled")
-            else:
-                rds_link = f'https://{region}.console.aws.amazon.com/rds/home?region={region}#modify-instance:id={db_cluster_identifier}'   
-                rds_title = f'<b>Modify DB Instance:</b> {db_cluster_identifier}' 
-                contextual_links += get_dashboard_button(rds_title , rds_link)  
-
-                notifications = f'''
-                    <p>You do not have Performance Insights enabled for this cluster. 
-                    Amazon RDS Performance Insights enables you to monitor and explore different dimensions of database load based on data captured from a running DB instance. 
-                    <a href="{rds_link}">{rds_title}</a>
-                '''                         
-
-            # Get Trace information            
-            filter_expression = f'rootcause.fault.service {{ name CONTAINS "{db_cluster_identifier}" }} AND (service(id(type: "Database::SQL"))) '
-            logger.info("X-Ray Filter Expression", filter_expression=filter_expression)
-            trace_summary, trace = process_traces(filter_expression, region, start_time, end_time)                   
-
+                  
             log_information = None
-            log_events = None                                     
+            log_events = None           
+            resource_information = None
+            resource_information_object = None 
+            trace_summary = None
+            trace = None            
+            notifications = None
+            tags = None                                     
 
         if db_cluster_identifier:
             dashboard_metrics = [
@@ -211,8 +190,8 @@ def process_rds(metric_name, dimensions, region, account_id, namespace, change_t
                 ]
             }                                                                                   
         ]            
-            widget_images = build_dashboard(dashboard_metrics, annotation_time, start, end, region)
-            additional_metrics_with_timestamps_removed = get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, region)
+            widget_images.extend(build_dashboard(dashboard_metrics, annotation_time, start, end, region))
+            additional_metrics_with_timestamps_removed.extend(get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, region))
 
             # Describe Cluster
             rds = boto3.client('rds', region_name=region)  
@@ -225,23 +204,106 @@ def process_rds(metric_name, dimensions, region, account_id, namespace, change_t
                 raise ValueError('The parameters you provided are incorrect: {}'.format(error)) 
             logger.info("Describe Cluster", extra=response)
 
-            # Performance Insights
-            performance_insights_enabled = response['DBClusters'][0].get('PerformanceInsightsEnabled', False)
+            resource_information = get_html_table("RDS Cluster" +db_cluster_identifier, response['DBClusters'][0])       
+            resource_information_object = response['DBClusters'][0]    
 
-            tags = response['DBClusters'][0].get('TagList', None)
+            # Get Tags
+            tags = response['DBClusters'][0].get('TagList', None)                    
 
-            if performance_insights_enabled:
-                logger.info("Performance Insights is Enabled")
+            # Initialize an empty list to hold resource IDs
+            db_resource_ids = []
+
+            # Describe DB Instances
+            try:
+                response = rds.describe_db_instances(
+                    Filters=[
+                        {
+                            'Name': 'db-cluster-id',
+                            'Values': [
+                                db_cluster_identifier,
+                            ]
+                        },
+                    ]                        
+                )   
+            except botocore.exceptions.ClientError as error:
+                logger.exception("Error describing DB Instances")
+                raise RuntimeError("Unable to fullfil request") from error  
+            except botocore.exceptions.ParamValidationError as error:
+                raise ValueError('The parameters you provided are incorrect: {}'.format(error)) 
+            logger.info("Describe DB Instances", extra=response)
+
+            # Iterate through DB instances to check if Performance Insights is enabled
+            for instance in response['DBInstances']:
+                if instance.get('PerformanceInsightsEnabled', False):
+                    db_resource_ids.append(instance['DbiResourceId'])
+
+            if db_resource_ids:
+                logger.info("Performance Insights is Enabled")            
+
+                pi = boto3.client('pi', region_name=region)
+
+                '''
+                os (OS counter metrics) - All engines
+                db (DB load metrics) - All engines except for Amazon DocumentDB
+                db.sql.stats (per-SQL metrics) - All engines except for Amazon DocumentDB
+                db.sql_tokenized.stats (per-SQL digest metrics) - All engines except for Amazon                 
+                '''
+                
+                dashboard_metrics = []  # Initialize an empty list for dashboard metrics
+
+                for db_resource_id in db_resource_ids:
+                    # Step 1: List available metrics for the resource
+                    available_metrics_response = pi.list_available_resource_metrics(
+                        ServiceType='RDS',
+                        Identifier=db_resource_id,
+                        MetricTypes=[
+                            'os',
+                            'db'
+                        ]                        
+                    )
+
+                    # Iterate through all available metrics and fetch them without group by
+                    for metric_detail in available_metrics_response['Metrics']:
+                        metric = metric_detail['Metric']
+
+                        logger.info("Metrics", extra=metric_detail)
+                        
+
+
+                        # Constructing the expression dynamically
+                        expression = f"DB_PERF_INSIGHTS('RDS', '{db_resource_id}', '{metric}.avg')"
+
+                        # Building the dashboard metric entry for the current metric
+                        metric_entry = {
+                            "title": metric,
+                            "view": "timeSeries",
+                            "stacked": False,
+                            "stat": "Average",
+                            "period": 300,
+                            "metrics": [
+                                [{"expression": expression, "label": metric}]
+                            ]
+                        }
+
+                        logger.info("Metric Entry", extra=metric_entry)
+
+                        # Append the current metric entry to the dashboard metrics list
+                        dashboard_metrics.append(metric_entry)                                
+            
+                # widget_images.extend(build_dashboard(dashboard_metrics, annotation_time, start, end, region))
+                additional_metrics_with_timestamps_removed.extend(get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, region))                        
+
             else:
-                rds_link = f'https://{region}.console.aws.amazon.com/rds/home?region={region}#modify-instance:id={db_cluster_identifier}'   
+                rds_link = f'https://{region}.console.aws.amazon.com/rds/home?region={region}#modify-cluster:id={db_cluster_identifier}'   
                 rds_title = f'<b>Modify DB Instance:</b> {db_cluster_identifier}' 
                 contextual_links += get_dashboard_button(rds_title , rds_link)  
 
-                notifications = f'''
-                    <p>You do not have Performance Insights enabled for this cluster. 
+                panel_title = "You do not have Performance Insights enabled for this cluster"
+                panel_content =  f''' 
                     Amazon RDS Performance Insights enables you to monitor and explore different dimensions of database load based on data captured from a running DB instance. 
                     <a href="{rds_link}">{rds_title}</a>
-                '''                         
+                '''
+                notifications = get_information_panel(panel_title, panel_content)                        
 
             # Get Trace information            
             filter_expression = f'rootcause.fault.service {{ name CONTAINS "{db_cluster_identifier}" }} AND (service(id(type: "Database::SQL"))) '
@@ -727,8 +789,8 @@ def process_rds(metric_name, dimensions, region, account_id, namespace, change_t
         "contextual_links": contextual_links,
         "log_information": log_information,
         "log_events": log_events,
-        "resource_information": None,
-        "resource_information_object": None,
+        "resource_information": resource_information,
+        "resource_information_object": resource_information_object,
         "notifications": notifications,
         "widget_images": widget_images,
         "additional_metrics_with_timestamps_removed": additional_metrics_with_timestamps_removed,

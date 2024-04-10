@@ -84,7 +84,10 @@ Resources:
                 - health:DescribeEvents
                 - health:DescribeEventDetails    
                 - cloudformation:GetTemplate    
-                - rds:DescribeDBClusters  
+                - rds:DescribeDBClusters
+                - rds:DescribeDBInstances
+                - pi:ListAvailableResourceMetrics
+                - pi:GetResourceMetrics
               Resource: "*"
             - Effect: Allow
               Action:

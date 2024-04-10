@@ -5,6 +5,7 @@ from functions import get_dashboard_button
 from functions import get_information_panel
 from functions import get_html_table
 from functions_logs import get_last_10_events
+from functions_logs import get_log_insights_link
 from functions_xray import generate_trace_html
 from functions_logs import check_log_group_exists
 from functions_metrics import build_dashboard

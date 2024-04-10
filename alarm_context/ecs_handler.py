@@ -8,6 +8,7 @@ from functions_logs import get_log_insights_link
 from functions_metrics import build_dashboard
 from functions_metrics import get_metrics_from_dashboard_metrics
 from functions_xray import process_traces
+from functions import get_information_panel
 
 from aws_lambda_powertools import Logger
 from aws_lambda_powertools import Tracer
@@ -56,15 +57,6 @@ def process_ecs(dimensions, region, account_id, namespace, change_time, annotati
                           
             resource_information += get_html_table("ECS Cluster: " +id, response['clusters'][0])
             resource_information_object.update(response['clusters'][0])
-
-            '''
-            # Check if Container Insights is enabled.
-            container_insights_enabled = False
-            for sub_elements in response['clusters'][0]['settings']:
-                if sub_elements['name'] == 'containerInsights':
-                    if sub_elements['value'] == 'enabled':
-                        container_insights_enabled = True
-            '''
 
             # Check if Container Insights is enabled
             container_insights_enabled = any(
@@ -223,7 +215,12 @@ def process_ecs(dimensions, region, account_id, namespace, change_time, annotati
                 widget_images.extend(build_dashboard(dashboard_metrics, annotation_time, start, end, region))
                 additional_metrics_with_timestamps_removed.extend(get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, region))
             else:
-                notifications += '<p>You do not have Container Insights enabled for this cluster. Use CloudWatch Container Insights to collect, aggregate, and summarize metrics and logs from your containerized applications and microservices.<a href="https://%s.console.aws.amazon.com/ecs/v2/account-settings/account-settings-edit?region=%s">Enable Container Insights</a>' % (region, region)
+                panel_title = "You do not have Container Insights enabled for this cluster"
+                panel_content =  f''' 
+                    Use CloudWatch Container Insights to collect, aggregate, and summarize metrics and logs from your containerized applications and microservices.
+                    <a href="https://{region}.console.aws.amazon.com/ecs/v2/account-settings/account-settings-edit?region={region}">Enable Container Insights</a>'
+                '''
+                notifications = get_information_panel(panel_title, panel_content)      
             ecs_link = 'https://%s.console.aws.amazon.com/ecs/v2/clusters/%s/services?region=%s' % (region, str(id), region)   
             ecs_title = '<b>ECS Console:</b> %s' % (str(id))
             contextual_links += get_dashboard_button(ecs_title , ecs_link)                 

@@ -119,8 +119,6 @@ def get_information_panel(panel_title, panel_content):
     information_panel += '</table>'
     return information_panel    
     
-
-
 @tracer.capture_method
 def get_html_table_with_fields(title, items_list, fields=None):
     """
