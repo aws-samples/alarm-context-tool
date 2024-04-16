@@ -141,6 +141,7 @@ def process_api_gateway(dimensions, region, account_id, namespace, change_time, 
 
         if api_name:
             # Get API Gateway ID using API Name          
+            # Add paginator for get_rest_apis
             try:
                 response = api_gateway.get_rest_apis()
             except botocore.exceptions.ClientError as error:

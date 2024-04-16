@@ -121,6 +121,7 @@ def generate_metric_widget(metrics, annotation_time, start_time, end_time, regio
         metrics["end"] = end_time.strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
         
         cloudwatch = boto3.client('cloudwatch', region_name=region)
+
         response = cloudwatch.get_metric_widget_image(MetricWidget=json.dumps(metrics))
         return response['MetricWidgetImage']        
 
@@ -308,6 +309,12 @@ def get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, regi
             StartTime=metric_data_start_time,
             EndTime=end_time_formatted
         )
+
+        # Log the entire metrics object as part of a structured log message
+        logger.info({
+            "message": "Logging metrics for visualization",
+            "metrics": response
+        })        
 
         # Enrich and clean the metric data results
         for metric_data_result in response.get('MetricDataResults', []):
