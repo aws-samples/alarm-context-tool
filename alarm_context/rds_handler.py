@@ -16,6 +16,149 @@ logger = Logger()
 tracer = Tracer()
 
 @tracer.capture_method
+def describe_db_instances(filters):
+  rds = boto3.client('rds')
+  try:
+      response = rds.describe_db_instances(
+          Filters=filters
+      )   
+  except botocore.exceptions.ClientError as error:
+      logger.exception("Error describing DB Instances")
+      raise RuntimeError("Unable to fullfil request") from error    
+  except botocore.exceptions.ParamValidationError as error:  
+      raise ValueError('The parameters you provided are incorrect: {}'
+                       .format(error))
+  logger.info("Describe DB Instances", extra=response)
+  return response
+
+@tracer.capture_method
+def get_db_resource_ids_with_pi(response):
+  db_resource_ids = []
+  for instance in response['DBInstances']:
+    if instance.get('PerformanceInsightsEnabled', False):
+      db_resource_ids.append(instance['DbiResourceId'])
+  return db_resource_ids
+
+@tracer.capture_method
+def get_pi_metrics(db_resource_ids, region):
+    logger.info("Performance Insights is Enabled")            
+    
+    # Performance Insights client setup
+    pi = boto3.client('pi', region_name=region)
+
+    # Metric types you are interested in
+    metric_types = ['os', 'db']
+
+    # Initialize the dashboard metrics list
+    dashboard_metrics = []
+
+    # Common metrics list - adjust based on your needs or keep it broad for comprehensive insights
+    common_metrics = [
+        'os.memory.active',
+        'os.memory.free',
+        'os.network.rx',
+        'os.network.tx'
+    ]
+
+    # PostgreSQL - https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_PerfInsights_Counters.html#USER_PerfInsights_Counters.PostgreSQL.Native
+    common_metrics.extend([
+        'db.SQL.tup_inserted',
+        'db.SQL.tup_updated', 
+        'db.SQL.tup_deleted',
+        'db.Checkpoint.checkpoints_req',
+        'db.IO.blk_read_time',
+        'db.Concurrency.deadlocks',
+        'db.Transactions.xact_commit', 
+        'db.Transactions.xact_rollback'
+    ])
+
+
+    # MariaDB and MySQL - https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_PerfInsights_Counters.html#USER_PerfInsights_Counters.MySQL.Native
+    common_metrics.extend([
+        'db.SQL.Innodb_rows_read',
+        'db.SQL.Select_scan', 
+        'db.SQL.Select_range',
+        'db.Users.Connections',
+        'db.Locks.Table_locks_waited',
+        'db.IO.Innodb_pages_written',
+        'db.Cache.Innodb_buffer_pool_reads',
+        'db.SQL.Slow_queries'
+    ])
+
+    # Microsoft SQL Server - https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_PerfInsights_Counters.html#USER_PerfInsights_Counters.SQLServer.Native
+    common_metrics.extend([
+        'db.Buffer Manager.Buffer cache hit ratio',
+        'db.Buffer Manager.Page life expectancy', 
+        'db.General Statistics.User Connections',
+        'db.SQL Statistics.Batch Requests',
+        'db.Locks.Number of Deadlocks (_Total)',
+        'db.Databases.Active Transactions (_Total)',
+        'db.Memory Manager.Memory Grants Pending',
+        'db.General Statistics.Processes blocked'
+    ])         
+
+    # Oracle - https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_PerfInsights_Counters.html#USER_PerfInsights_Counters.Oracle.Native# Microsoft SQL Server - https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_PerfInsights_Counters.html#USER_PerfInsights_Counters.SQLServer.Native
+    common_metrics.extend([
+        'db.User.CPU used by this session',         
+        'db.User.SQL*Net roundtrips to/from client',
+        'db.Redo.redo size',                        
+        'db.SQL.table scan rows gotten',            
+        'db.Cache.DBWR checkpoints',                
+        'db.Cache.physical reads',                  
+        'db.SQL.parse count (hard)',                
+        'db.User.user commits'                      
+    ])                       
+
+    logger.info({"message": "common_metrics:", "common_metrics": common_metrics})
+
+    # Retrieve all available metrics across all DB resource IDs first
+    all_available_metrics = set()
+
+    for db_resource_id in db_resource_ids:
+        try:
+            response = pi.list_available_resource_metrics(
+                ServiceType='RDS',
+                Identifier=db_resource_id,
+                MetricTypes=metric_types
+            )  
+        except botocore.exceptions.ClientError as error:
+            logger.exception("Error listing available resource metrics")
+            raise RuntimeError("Unable to fullfil request") from error  
+        except botocore.exceptions.ParamValidationError as error:
+            raise ValueError('The parameters you provided are incorrect: {}'.format(error)) 
+        for metric_detail in response['Metrics']:
+            metric = metric_detail['Metric']
+            all_available_metrics.add(metric)
+
+    logger.info({"message": "all_available_metrics:", "all_available_metrics": list(all_available_metrics)})
+
+    # Filter the set of all available metrics to include only the common metrics
+    filtered_metrics = all_available_metrics.intersection(set(common_metrics))
+
+    logger.info({"message": "filtered_metrics:", "filtered_metrics": filtered_metrics})
+
+    # Now, for each common metric, build a dashboard metric entry including all DB resource IDs
+    for metric in filtered_metrics:
+        metric_data_queries = []
+
+        for db_resource_id in db_resource_ids:
+            expression = f"DB_PERF_INSIGHTS('RDS', '{db_resource_id}', '{metric}.avg')"
+            # Wrap each metric query in its own array, including a dictionary for the expression and label
+            metric_data_queries.append([{"expression": expression, "label": db_resource_id}])
+
+        dashboard_metrics.append({
+            "title": metric,
+            "view": "timeSeries",
+            "stacked": False,
+            "stat": "Average",
+            "period": 300,
+            # The "metrics" field is already properly formatted as an array of arrays
+            "metrics": metric_data_queries
+        })
+    logger.info({"message": "dashboard_metrics:", "dashboard_metrics": dashboard_metrics}) 
+    return dashboard_metrics 
+
+@tracer.capture_method
 def process_rds(metric_name, dimensions, region, account_id, namespace, change_time, annotation_time, start_time, end_time, start, end):  
 
     # RDS Automatic Dashboards
@@ -37,8 +180,9 @@ def process_rds(metric_name, dimensions, region, account_id, namespace, change_t
         # Possible Dimensions: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/dimensions.html
         db_cluster_identifier = dimension_values.get('DBClusterIdentifier')
         db_instance_identifier = dimension_values.get('DBInstanceIdentifier')
+        dbi_resource_id = dimension_values.get('DbiResourceId')
         database_class = dimension_values.get('DatabaseClass')
-        engine_name = dimension_values.get('EngineName')
+        engine_name = dimension_values.get('EngineName')        
         source_region = dimension_values.get('SourceRegion')
         
 
@@ -214,158 +358,29 @@ def process_rds(metric_name, dimensions, region, account_id, namespace, change_t
             db_resource_ids = []
 
             # Describe DB Instances
-            try:
-                response = rds.describe_db_instances(
-                    Filters=[
-                        {
-                            'Name': 'db-cluster-id',
-                            'Values': [
-                                db_cluster_identifier,
-                            ]
-                        },
-                    ]                        
-                )   
-            except botocore.exceptions.ClientError as error:
-                logger.exception("Error describing DB Instances")
-                raise RuntimeError("Unable to fullfil request") from error  
-            except botocore.exceptions.ParamValidationError as error:
-                raise ValueError('The parameters you provided are incorrect: {}'.format(error)) 
-            logger.info("Describe DB Instances", extra=response)
+            filters = [
+                {
+                    'Name': 'db-cluster-id',  
+                    'Values': [
+                        db_cluster_identifier,
+                    ]
+                }
+            ]
+            response = describe_db_instances(filters)
 
-            # Iterate through DB instances to check if Performance Insights is enabled
-            for instance in response['DBInstances']:
-                if instance.get('PerformanceInsightsEnabled', False):
-                    db_resource_ids.append(instance['DbiResourceId'])
+            # Get DB instances with performance insights enabled
+            db_resource_ids = get_db_resource_ids_with_pi(response)
+
 
             if db_resource_ids:
-                logger.info("Performance Insights is Enabled")            
-              
-                # Performance Insights client setup
-                pi = boto3.client('pi', region_name=region)
-
-                # Metric types you are interested in
-                metric_types = ['os', 'db']
-
-                # Initialize the dashboard metrics list
-                dashboard_metrics = []
-
-                # Common metrics list - adjust based on your needs or keep it broad for comprehensive insights
-                common_metrics = [
-                    'os.memory.active',
-                    'os.memory.free',
-                    'os.network.rx',
-                    'os.network.tx'
-                ]
-
-                # PostgreSQL - https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_PerfInsights_Counters.html#USER_PerfInsights_Counters.PostgreSQL.Native
-                common_metrics.extend([
-                    'db.SQL.tup_inserted',
-                    'db.SQL.tup_updated', 
-                    'db.SQL.tup_deleted',
-                    'db.Checkpoint.checkpoints_req',
-                    'db.IO.blk_read_time',
-                    'db.Concurrency.deadlocks',
-                    'db.Transactions.xact_commit', 
-                    'db.Transactions.xact_rollback'
-                ])
-
-
-                # MariaDB and MySQL - https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_PerfInsights_Counters.html#USER_PerfInsights_Counters.MySQL.Native
-                common_metrics.extend([
-                    'db.SQL.Innodb_rows_read',
-                    'db.SQL.Select_scan', 
-                    'db.SQL.Select_range',
-                    'db.Users.Connections',
-                    'db.Locks.Table_locks_waited',
-                    'db.IO.Innodb_pages_written',
-                    'db.Cache.Innodb_buffer_pool_reads',
-                    'db.SQL.Slow_queries'
-                ])
-
-                # Microsoft SQL Server - https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_PerfInsights_Counters.html#USER_PerfInsights_Counters.SQLServer.Native
-                common_metrics.extend([
-                    'db.Buffer Manager.Buffer cache hit ratio',
-                    'db.Buffer Manager.Page life expectancy', 
-                    'db.General Statistics.User Connections',
-                    'db.SQL Statistics.Batch Requests',
-                    'db.Locks.Number of Deadlocks (_Total)',
-                    'db.Databases.Active Transactions (_Total)',
-                    'db.Memory Manager.Memory Grants Pending',
-                    'db.General Statistics.Processes blocked'
-                ])         
-
-                # Oracle - https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_PerfInsights_Counters.html#USER_PerfInsights_Counters.Oracle.Native# Microsoft SQL Server - https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_PerfInsights_Counters.html#USER_PerfInsights_Counters.SQLServer.Native
-                common_metrics.extend([
-                    'db.User.CPU used by this session',         
-                    'db.User.SQL*Net roundtrips to/from client',
-                    'db.Redo.redo size',                        
-                    'db.SQL.table scan rows gotten',            
-                    'db.Cache.DBWR checkpoints',                
-                    'db.Cache.physical reads',                  
-                    'db.SQL.parse count (hard)',                
-                    'db.User.user commits'                      
-                ])                       
-
-
-
-                logger.info({"message": "common_metrics:", "common_metrics": common_metrics})
-
-
-                # Retrieve all available metrics across all DB resource IDs first
-                all_available_metrics = set()
-
-                for db_resource_id in db_resource_ids:
-                    try:
-                        response = pi.list_available_resource_metrics(
-                            ServiceType='RDS',
-                            Identifier=db_resource_id,
-                            MetricTypes=metric_types
-                        )  
-                    except botocore.exceptions.ClientError as error:
-                        logger.exception("Error listing available resource metrics")
-                        raise RuntimeError("Unable to fullfil request") from error  
-                    except botocore.exceptions.ParamValidationError as error:
-                        raise ValueError('The parameters you provided are incorrect: {}'.format(error)) 
-                    for metric_detail in response['Metrics']:
-                        metric = metric_detail['Metric']
-                        all_available_metrics.add(metric)
-
-                logger.info({"message": "all_available_metrics:", "all_available_metrics": list(all_available_metrics)})
-
-                # Filter the set of all available metrics to include only the common metrics
-                filtered_metrics = all_available_metrics.intersection(set(common_metrics))
-
-                logger.info({"message": "filtered_metrics:", "filtered_metrics": filtered_metrics})
-
-
-                # Now, for each common metric, build a dashboard metric entry including all DB resource IDs
-                for metric in filtered_metrics:
-                    metric_data_queries = []
-
-                    for db_resource_id in db_resource_ids:
-                        expression = f"DB_PERF_INSIGHTS('RDS', '{db_resource_id}', '{metric}.avg')"
-                        # Wrap each metric query in its own array, including a dictionary for the expression and label
-                        metric_data_queries.append([{"expression": expression, "label": db_resource_id}])
-
-                    dashboard_metrics.append({
-                        "title": metric,
-                        "view": "timeSeries",
-                        "stacked": False,
-                        "stat": "Average",
-                        "period": 300,
-                        # The "metrics" field is already properly formatted as an array of arrays
-                        "metrics": metric_data_queries
-                    })
-
-
-                logger.info({"message": "dashboard_metrics:", "dashboard_metrics": dashboard_metrics})             
-            
+                #Get performance insights metrics
+                dashboard_metrics = get_pi_metrics(db_resource_ids, region)            
                 widget_images.extend(build_dashboard(dashboard_metrics, annotation_time, start, end, region))
                 additional_metrics_with_timestamps_removed.extend(get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, region))                        
 
             else:
                 rds_link = f'https://{region}.console.aws.amazon.com/rds/home?region={region}#modify-cluster:id={db_cluster_identifier}'   
-                rds_title = f'<b>Modify DB Instance:</b> {db_cluster_identifier}' 
+                rds_title = f'<b>Modify DB Cluster:</b> {db_cluster_identifier}' 
                 contextual_links += get_dashboard_button(rds_title , rds_link)  
 
                 panel_title = "You do not have Performance Insights enabled for this cluster"
@@ -383,7 +398,33 @@ def process_rds(metric_name, dimensions, region, account_id, namespace, change_t
             log_information = None
             log_events = None                                     
 
-        elif db_instance_identifier:
+        elif db_instance_identifier or dbi_resource_id:
+            if dbi_resource_id:   
+                filters = [
+                    {
+                        'Name': 'dbi-resource-id',  
+                        'Values': [
+                            dbi_resource_id,
+                        ]
+                    }
+                ]
+            else:                         
+                filters = [
+                    {
+                        'Name': 'db-instance-id',  
+                        'Values': [
+                            db_instance_identifier,
+                        ]
+                    }
+                ]
+
+            # Describe DB Instances
+            response = describe_db_instances(filters)
+            
+            # Get Tags
+            tags = response['DBInstances'][0].get('TagList', None)                
+            db_instance_identifier = response['DBInstances'][0].get('DBInstanceIdentifier', None)  
+
             dashboard_metrics = [
                 {
                     "title": "CPUUtilization",
@@ -489,14 +530,36 @@ def process_rds(metric_name, dimensions, region, account_id, namespace, change_t
             widget_images = build_dashboard(dashboard_metrics, annotation_time, start, end, region)
             additional_metrics_with_timestamps_removed = get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, region)
 
+            # Get DB instances with performance insights enabled
+            db_resource_ids = get_db_resource_ids_with_pi(response)
+
+
+            if db_resource_ids:
+                #Get performance insights metrics
+                dashboard_metrics = get_pi_metrics(db_resource_ids, region)            
+                widget_images.extend(build_dashboard(dashboard_metrics, annotation_time, start, end, region))
+                additional_metrics_with_timestamps_removed.extend(get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, region))                        
+
+            else:
+                rds_link = f'https://{region}.console.aws.amazon.com/rds/home?region={region}#modify-cluster:id={db_cluster_identifier}'   
+                rds_title = f'<b>Modify DB Cluster:</b> {db_cluster_identifier}' 
+                contextual_links += get_dashboard_button(rds_title , rds_link)  
+
+                panel_title = "You do not have Performance Insights enabled for this instance"
+                panel_content =  f''' 
+                    Amazon RDS Performance Insights enables you to monitor and explore different dimensions of database load based on data captured from a running DB instance. 
+                    <a href="{rds_link}">{rds_title}</a>
+                '''
+                notifications = get_information_panel(panel_title, panel_content)                        
+
+            # Get Trace information            
+            filter_expression = f'rootcause.fault.service {{ name CONTAINS "{db_instance_identifier}" }} AND (service(id(type: "Database::SQL"))) '
+            logger.info("X-Ray Filter Expression", filter_expression=filter_expression)
+            trace_summary, trace = process_traces(filter_expression, region, start_time, end_time)                   
+
             log_information = None
-            log_events = None           
-            resource_information = None
-            resource_information_object = None 
-            trace_summary = None
-            trace = None            
-            notifications = None
-            tags = None              
+            log_events = None 
+             
 
         elif database_class:
             dashboard_metrics = [

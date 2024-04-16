@@ -44,6 +44,7 @@ from email.mime.application import MIMEApplication
 from functions import get_html_table
 from functions_metrics import generate_main_metric_widget
 from functions_metrics import get_metric_data
+from functions_metrics import get_metric_data_for_expression
 from functions import create_test_case
 from functions_metrics import get_metric_array
 from functions_health import describe_events
@@ -222,8 +223,12 @@ def alarm_handler(event, context):
     graph = generate_main_metric_widget(metrics_array, annotation_time, region, start_time, end_time)
     
     # Get metric data
-    metric_data = get_metric_data(region, namespace, metric_name, dimensions, period, statistic, account_id, change_time, end_time)
+    if metrics_array[0]['type'] == 'Expression':
+        metric_data = get_metric_data_for_expression(region, message['Trigger'], metric_name, account_id, change_time, end_time)
+    else:
+        metric_data = get_metric_data(region, namespace, metric_name, dimensions, period, statistic, account_id, change_time, end_time)
     
+
     # Alarm History
     alarm_history = get_alarm_history(region, alarm_name)
 

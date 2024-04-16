@@ -390,18 +390,48 @@ def get_metric_array(trigger):
                     'label': metric.get('Label', '')
                 })
             elif 'Expression' in metric:
-                metrics_array.append({
-                    'type': 'Expression',
-                    'id': metric['Id'],
-                    'expression': metric['Expression'],
-                    'label': metric.get('Label', '')
-                })
+                expression = metric['Expression']
+                if "DB_PERF_INSIGHTS" in expression:
+                    # Extract the DB identifier from the expression
+                    db_identifier = extract_db_identifier(expression)
+                    dimensions = [{'name': 'DbiResourceId', 'value': db_identifier}]
+                    namespace = 'AWS/RDS'
+                    metric_name = expression  # This will store the whole expression
+                    # Append expression as a metric
+                    metrics_array.append({
+                        'type': 'Expression',
+                        'id': metric['Id'],
+                        'expression': expression,
+                        'label': metric.get('Label', ''),
+                        'namespace': namespace,
+                        'dimensions': dimensions
+                    })
+                else:                
+                    metrics_array.append({
+                        'type': 'Expression',
+                        'id': metric['Id'],
+                        'expression': expression,
+                        'label': metric.get('Label', '')
+                    })
 
-    #if not namespace or not metric_name or not statistic or not dimensions:
-    if not namespace or not metric_name or not statistic:            
+    #if not namespace or not metric_name or not statistic:            
+    if not namespace or (not metric_name and not any('Expression' in m for m in metrics_array)):
         raise ValueError("Required metric details not found in Alarm message")
 
     return namespace, metric_name, statistic, dimensions, metrics_array
+
+@tracer.capture_method
+def extract_db_identifier(expression):
+    """
+    Extracts the database identifier from a performance insights expression.
+    """
+    try:
+        parts = expression.split(',')
+        db_identifier = parts[1].strip().strip("'\"")
+        return db_identifier
+    except Exception as e:
+        raise ValueError("Could not extract DB instance identifier from expression")
+
 
 @tracer.capture_method
 def get_metric_data(region, namespace, metric_name, dimensions, period, statistic, account_id, change_time, end_time):
@@ -451,6 +481,56 @@ def get_metric_data(region, namespace, metric_name, dimensions, period, statisti
             ],
             StartTime=metric_data_start_time,
             EndTime=end_time,
+        )    
+    except botocore.exceptions.ClientError as error:
+        logger.exception("Error getting metric data")
+        raise RuntimeError("Unable to fullfil request") from error  
+    except botocore.exceptions.ParamValidationError as error:
+        raise ValueError('The parameters you provided are incorrect: {}'.format(error))      
+    
+    # Enrich and clean the metric data results
+    for metric_data_result in response.get('MetricDataResults', []):
+        if 'Values' in metric_data_result:
+            metric_data_result['Values'] = [round(value, int(os.environ.get('METRIC_ROUNDING_PRECISION_FOR_BEDROCK'))) for value in metric_data_result['Values']]        
+        metric_data_result.pop('Timestamps', None)        
+
+    # Optionally remove 'Messages', 'ResponseMetadata', and 'RetryAttempts' from the response
+    response.pop('Messages', None)
+    response.pop('ResponseMetadata', None)
+    response.pop('RetryAttempts', None)    
+    
+    logger.info(metric_name +" - Metric Data: " + str(response))
+    return metric_name + " - Metric Data: " + str(response)    
+
+@tracer.capture_method
+def get_metric_data_for_expression(region, trigger, metric_name, account_id, change_time, end_time):
+    """
+    Retrieves the metric data for the given parameters.
+    
+    Args:
+        region (str): The AWS region where the metric is located.
+        trigger (dict): The 'Trigger' part of the CloudWatch alarm containing the 'Metrics' array.
+        metric_name (str): The name of the metric.
+        account_id (str): The AWS account ID where the metric is located.
+        change_time (datetime): The time when the alarm state changed.
+        end_time (str): The end time for the metric data.
+    
+    Returns:
+        str: The metric data in string format.
+    """
+
+    #logger.info("Dimensions", dimensions=dimensions)    
+    #dimensions = [{"Name": dim["name"], "Value": dim["value"]} for dim in dimensions]
+    
+    metric_data_start = change_time + datetime.timedelta(minutes=-1500)
+    metric_data_start_time = metric_data_start.strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + metric_data_start.strftime('%z')
+    
+    cloudwatch = boto3.client('cloudwatch', region_name=region)
+    try:
+        response = cloudwatch.get_metric_data(
+            MetricDataQueries=trigger['Metrics'],
+            StartTime=metric_data_start_time,
+            EndTime=end_time
         )    
     except botocore.exceptions.ClientError as error:
         logger.exception("Error getting metric data")
