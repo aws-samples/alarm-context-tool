@@ -3,8 +3,7 @@ import botocore
 
 from functions import get_dashboard_button
 from functions import get_html_table
-from functions_logs import get_last_10_events
-from functions_logs import get_log_insights_link
+
 from functions_xray import process_traces
 from functions_metrics import build_dashboard
 from functions_metrics import get_metrics_from_dashboard_metrics
@@ -180,6 +179,7 @@ def process_rds(metric_name, dimensions, region, account_id, namespace, change_t
         # Possible Dimensions: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/dimensions.html
         db_cluster_identifier = dimension_values.get('DBClusterIdentifier')
         db_instance_identifier = dimension_values.get('DBInstanceIdentifier')
+        # This is not an actual dimension, it's if the alarm is triggered using a Performance Insights Metric
         dbi_resource_id = dimension_values.get('DbiResourceId')
         database_class = dimension_values.get('DatabaseClass')
         engine_name = dimension_values.get('EngineName')        

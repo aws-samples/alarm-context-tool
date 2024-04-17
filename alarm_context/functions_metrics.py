@@ -432,109 +432,74 @@ def extract_db_identifier(expression):
     except Exception as e:
         raise ValueError("Could not extract DB instance identifier from expression")
 
-
 @tracer.capture_method
-def get_metric_data(region, namespace, metric_name, dimensions, period, statistic, account_id, change_time, end_time):
+def get_metric_data(region, trigger, metric_name, account_id, change_time, end_time):
     """
-    Retrieves the metric data for the given parameters.
+    Retrieves the metric data for given parameters from the CloudWatch alarm's trigger.
     
     Args:
         region (str): The AWS region where the metric is located.
-        namespace (str): The namespace of the metric.
-        metric_name (str): The name of the metric.
-        dimensions (list): The dimensions of the metric.
-        period (int): The period of the metric data.
-        statistic (str): The statistic to use for the metric data.
+        trigger (dict): The 'Trigger' part of the CloudWatch alarm message.
         account_id (str): The AWS account ID where the metric is located.
-        change_time (datetime): The time when the alarm state changed.
-        end_time (str): The end time for the metric data.
+        change_time (datetime.datetime): The time when the alarm state changed.
+        end_time (datetime.datetime): The end time for the metric data.
     
     Returns:
         str: The metric data in string format.
     """
+    
 
-    logger.info("Dimensions", dimensions=dimensions)    
-    dimensions = [{"Name": dim["name"], "Value": dim["value"]} for dim in dimensions]
-    
-    metric_data_start = change_time + datetime.timedelta(minutes=-1500)
-    metric_data_start_time = metric_data_start.strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + metric_data_start.strftime('%z')
-    
-    cloudwatch = boto3.client('cloudwatch', region_name=region)
-    try:
-        response = cloudwatch.get_metric_data(
-            MetricDataQueries=[
-                {
-                    'Id': 'a1',
-                    'MetricStat': {
-                        'Metric': {
-                            'Namespace': namespace,
-                            'MetricName': metric_name,
-                            'Dimensions': dimensions
-                        },
-                        'Period': period,
-                        'Stat': statistic
-                    },
-                    'Label': 'string',
-                    'ReturnData': True,
-                    'AccountId': account_id
+
+    # Single Metric with Namespace
+    if 'Namespace' in trigger:
+
+        # Transform dimensions to correct format
+        dimensions = [{"Name": dim["name"], "Value": dim["value"]} for dim in trigger.get('Dimensions', [])]
+
+        metric_data_queries = [{
+            'Id': 'm1',
+            'MetricStat': {
+                'Metric': {
+                    'Namespace': trigger.get('Namespace'),
+                    'MetricName': trigger.get('MetricName'),
+                    'Dimensions': dimensions
                 },
-            ],
-            StartTime=metric_data_start_time,
-            EndTime=end_time,
-        )    
-    except botocore.exceptions.ClientError as error:
-        logger.exception("Error getting metric data")
-        raise RuntimeError("Unable to fullfil request") from error  
-    except botocore.exceptions.ParamValidationError as error:
-        raise ValueError('The parameters you provided are incorrect: {}'.format(error))      
-    
-    # Enrich and clean the metric data results
-    for metric_data_result in response.get('MetricDataResults', []):
-        if 'Values' in metric_data_result:
-            metric_data_result['Values'] = [round(value, int(os.environ.get('METRIC_ROUNDING_PRECISION_FOR_BEDROCK'))) for value in metric_data_result['Values']]        
-        metric_data_result.pop('Timestamps', None)        
+                'Period':trigger.get('Period'),
+                'Stat': correct_statistic_case(trigger.get('Statistic'))
+            },
+            'Label': trigger.get('MetricName'),
+            'ReturnData': True,
+            'AccountId': account_id
+        }]      
 
-    # Optionally remove 'Messages', 'ResponseMetadata', and 'RetryAttempts' from the response
-    response.pop('Messages', None)
-    response.pop('ResponseMetadata', None)
-    response.pop('RetryAttempts', None)    
-    
-    logger.info(metric_name +" - Metric Data: " + str(response))
-    return metric_name + " - Metric Data: " + str(response)    
+    # Single or multiple metrics with an expression
+    elif 'Metrics' in trigger:
+        metric_data_queries = []
 
-@tracer.capture_method
-def get_metric_data_for_expression(region, trigger, metric_name, account_id, change_time, end_time):
-    """
-    Retrieves the metric data for the given parameters.
-    
-    Args:
-        region (str): The AWS region where the metric is located.
-        trigger (dict): The 'Trigger' part of the CloudWatch alarm containing the 'Metrics' array.
-        metric_name (str): The name of the metric.
-        account_id (str): The AWS account ID where the metric is located.
-        change_time (datetime): The time when the alarm state changed.
-        end_time (str): The end time for the metric data.
-    
-    Returns:
-        str: The metric data in string format.
-    """
-
-    #logger.info("Dimensions", dimensions=dimensions)    
-    #dimensions = [{"Name": dim["name"], "Value": dim["value"]} for dim in dimensions]
+        for metric in trigger['Metrics']:
+            if 'MetricStat' in metric:
+                if 'Dimensions' in metric['MetricStat']['Metric']:
+                    # Transform dimensions to correct format
+                    metric['MetricStat']['Metric']['Dimensions'] = [
+                        {"Name": dim["name"], "Value": dim["value"]} for dim in metric['MetricStat']['Metric']['Dimensions']
+                    ]
+            # Directly append the metric, modified or not, to the queries list
+            metric_data_queries.append(metric)
     
     metric_data_start = change_time + datetime.timedelta(minutes=-1500)
     metric_data_start_time = metric_data_start.strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + metric_data_start.strftime('%z')
-    
+
     cloudwatch = boto3.client('cloudwatch', region_name=region)
+    
     try:
         response = cloudwatch.get_metric_data(
-            MetricDataQueries=trigger['Metrics'],
+            MetricDataQueries=metric_data_queries,
             StartTime=metric_data_start_time,
             EndTime=end_time
-        )    
+        )
     except botocore.exceptions.ClientError as error:
         logger.exception("Error getting metric data")
-        raise RuntimeError("Unable to fullfil request") from error  
+        raise RuntimeError("Unable to fulfill request") from error  
     except botocore.exceptions.ParamValidationError as error:
         raise ValueError('The parameters you provided are incorrect: {}'.format(error))      
     
@@ -550,4 +515,4 @@ def get_metric_data_for_expression(region, trigger, metric_name, account_id, cha
     response.pop('RetryAttempts', None)    
     
     logger.info(metric_name +" - Metric Data: " + str(response))
-    return metric_name + " - Metric Data: " + str(response)    
+    return metric_name + " - Metric Data: " + str(response)
