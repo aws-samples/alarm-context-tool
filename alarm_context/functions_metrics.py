@@ -103,8 +103,7 @@ def generate_metric_widget(metrics, annotation_time, start_time, end_time, regio
                         </table>        
         """ % (metrics['title'], last_value, metric_name)  
         return metric_value        
-    else:
-        
+    else:       
         # Add Annotation
         metrics["annotations"] = {
             "vertical": [
@@ -114,15 +113,20 @@ def generate_metric_widget(metrics, annotation_time, start_time, end_time, regio
                 }
             ]
         }
-        
         metrics["width"] = 320
         metrics["height"] = 200      
         metrics["start"] = start_time.strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
         metrics["end"] = end_time.strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
-        
-        cloudwatch = boto3.client('cloudwatch', region_name=region)
 
-        response = cloudwatch.get_metric_widget_image(MetricWidget=json.dumps(metrics))
+        cloudwatch = boto3.client('cloudwatch', region_name=region)
+        try:
+            response = cloudwatch.get_metric_widget_image(MetricWidget=json.dumps(metrics))
+        except botocore.exceptions.ClientError as error:
+            logger.exception("Error getting metric widget image")
+            raise RuntimeError("Unable to fullfil request") from error  
+        except botocore.exceptions.ParamValidationError as error:
+            raise ValueError('The parameters you provided are incorrect: {}'.format(error))
+        
         return response['MetricWidgetImage']        
 
 @tracer.capture_method
@@ -214,7 +218,15 @@ def generate_main_metric_widget(metrics_array, annotation_time, region, start_ti
     # Fetch the widget image
     cloudwatch = boto3.client('cloudwatch', region_name=region)
     logger.info("Widget JSON: " + json.dumps(widget_config))
-    response = cloudwatch.get_metric_widget_image(MetricWidget=json.dumps(widget_config))
+    
+    try:
+        response = cloudwatch.get_metric_widget_image(MetricWidget=json.dumps(widget_config))
+    except botocore.exceptions.ClientError as error:
+        logger.exception("Error getting metric widget image")
+        raise RuntimeError("Unable to fullfil request") from error  
+    except botocore.exceptions.ParamValidationError as error:
+        raise ValueError('The parameters you provided are incorrect: {}'.format(error))  
+      
     return response['MetricWidgetImage']
 
 @tracer.capture_method
@@ -304,12 +316,18 @@ def get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, regi
             query_id_counter += 1
 
         # Fetch metric data for the current set of widget queries
-        response = boto3.client('cloudwatch', region_name=region).get_metric_data(
-            MetricDataQueries=widget_metric_data_queries,
-            StartTime=metric_data_start_time,
-            EndTime=end_time_formatted
-        )
-
+        try:
+            response = boto3.client('cloudwatch', region_name=region).get_metric_data(
+                MetricDataQueries=widget_metric_data_queries,
+                StartTime=metric_data_start_time,
+                EndTime=end_time_formatted
+            )
+        except botocore.exceptions.ClientError as error:
+            logger.exception("Error getting metric data")
+            raise RuntimeError("Unable to fullfil request") from error  
+        except botocore.exceptions.ParamValidationError as error:
+            raise ValueError('The parameters you provided are incorrect: {}'.format(error))
+            
         # Log the entire metrics object as part of a structured log message
         logger.info({
             "message": "Logging metrics for visualization",

@@ -36,6 +36,7 @@ import ssm_run_command_handler
 import application_elb_handler
 import api_gateway_handler
 import rds_handler
+import eks_handler
 
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -156,9 +157,12 @@ def alarm_handler(event, context):
     elif namespace == "AWS/ApiGateway":
         response = api_gateway_handler.process_api_gateway(dimensions, region, account_id, namespace, change_time, annotation_time, start_time, end_time, start, end) 
     
-    #For RDS
     elif namespace == "AWS/RDS":
         response = rds_handler.process_rds(metric_name, dimensions, region, account_id, namespace, change_time, annotation_time, start_time, end_time, start, end) 
+
+    elif namespace in ("ContainerInsights"):
+        response = eks_handler.process_eks(metric_name, dimensions, region, account_id, namespace, change_time, annotation_time, start_time, end_time, start, end)
+
 
     else:
         # Namespace not matched

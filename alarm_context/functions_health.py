@@ -1,4 +1,5 @@
 import datetime
+import botocore
 
 from  health_client import HealthClient
 
@@ -27,26 +28,35 @@ def event_details(event_arns):
 @tracer.capture_method
 def describe_events(region):
     events_paginator = HealthClient.client().get_paginator('describe_events')
-    events_pages = events_paginator.paginate(filter={
-        'startTimes': [
-            {
-                'from': datetime.datetime.now() - datetime.timedelta(days=7)
-            }
-        ],
-        'regions': [
-            region,
-        ],
-        'eventStatusCodes': ['open', 'upcoming']
-    })
 
-    event_arns = []
-    for events_page in events_pages:
-        for event in events_page['events']:
-            event_arns.append(event['arn'])
+    try:
+        events_pages = events_paginator.paginate(filter={
+            'startTimes': [
+                {
+                    'from': datetime.datetime.now() - datetime.timedelta(days=7)
+                }
+            ],
+            'regions': [
+                region,
+            ],
+            'eventStatusCodes': ['open', 'upcoming']
+        })
 
-    if event_arns:
-        event_descriptions = event_details(event_arns)
-        return event_descriptions
+        event_arns = []
+        for events_page in events_pages:
+            for event in events_page['events']:
+                event_arns.append(event['arn'])
+
+
+    except botocore.exceptions.ClientError as error:
+        logger.exception("Error listing available resource metrics")
+        raise RuntimeError("Unable to fullfil request") from error  
+    except botocore.exceptions.ParamValidationError as error:
+        raise ValueError('The parameters you provided are incorrect: {}'.format(error))
     else:
-        logger.info('There are no AWS Health events that match the given filters')
-        return {}
+        if event_arns:
+            event_descriptions = event_details(event_arns)         
+            return event_descriptions
+        else:
+            logger.info('There are no AWS Health events that match the given filters')
+            return {}

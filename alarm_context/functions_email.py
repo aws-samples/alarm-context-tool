@@ -1,4 +1,5 @@
 import boto3
+import botocore
 import os
 import base64
 import urllib.parse
@@ -114,8 +115,11 @@ def send_email(sender, recipient, subject, body_text, body_html, attachments=Non
         ses = boto3.client('ses', region_name=os.environ['AWS_REGION'])
         response = ses.send_raw_email(Source=sender, Destinations=[recipient], RawMessage={'Data': msg.as_string()})
         print("Email Sent", response['MessageId'])
-    except Exception as e:
-        print("Error sending email:", e)
+    except botocore.exceptions.ClientError as error:
+        logger.exception("Error Sending Email")
+        raise RuntimeError("Unable to fullfil request") from error
+    except botocore.exceptions.ParamValidationError as error:
+        raise ValueError('The parameters you provided are incorrect: {}'.format(error))        
 
 @tracer.capture_method
 def build_html_body(subject, summary, ai_response, widget_images, trace_html, additional_information, alarm_details, metric_details):

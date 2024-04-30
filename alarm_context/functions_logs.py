@@ -75,12 +75,19 @@ def get_last_10_events(log_input, timestamp, region):
         log_groups = search_log_groups(log_stream_name)
         log_events = []
         for log_group in log_groups:
-            response = logs.filter_log_events(
-                logGroupName=log_group, 
-                logStreamNames=[log_stream_name], 
-                limit=10, 
-                endTime=int(timestamp.timestamp() * 1000)
-            )
+            try:
+                response = logs.filter_log_events(
+                    logGroupName=log_group, 
+                    logStreamNames=[log_stream_name], 
+                    limit=10, 
+                    endTime=int(timestamp.timestamp() * 1000)
+                )
+            except botocore.exceptions.ClientError as error:
+                logger.exception("Error filtering log events")
+                raise RuntimeError("Unable to fullfil request") from error  
+            except botocore.exceptions.ParamValidationError as error:
+                raise ValueError('The parameters you provided are incorrect: {}'.format(error))            
+
             log_events.extend(response['events'])
 
             if not log_events:
@@ -98,7 +105,14 @@ def get_last_10_events(log_input, timestamp, region):
     elif 'logGroupName' in log_input:
         log_group_name = log_input['logGroupName']
 
-        response = logs.filter_log_events(logGroupName=log_group_name, limit=10, endTime=int(timestamp.timestamp() * 1000))
+        try:
+            response = logs.filter_log_events(logGroupName=log_group_name, limit=10, endTime=int(timestamp.timestamp() * 1000))
+        except botocore.exceptions.ClientError as error:
+            logger.exception("Error filtering log events")
+            raise RuntimeError("Unable to fullfil request") from error  
+        except botocore.exceptions.ParamValidationError as error:
+            raise ValueError('The parameters you provided are incorrect: {}'.format(error)) 
+        
         log_events = response['events']
         
         if not log_events or len(log_events) == 0:
@@ -132,24 +146,36 @@ def search_log_groups(log_stream_name):
     
     A list of log group names that contain the given log stream name.
     """    
-    response = logs.describe_log_groups()
+    try:
+        response = logs.describe_log_groups()
+    except botocore.exceptions.ClientError as error:
+        logger.exception("Error describing log groups")
+        raise RuntimeError("Unable to fullfil request") from error  
+    except botocore.exceptions.ParamValidationError as error:
+        raise ValueError('The parameters you provided are incorrect: {}'.format(error)) 
+
     log_groups = response['logGroups']
-    while 'nextToken' in response:
-        response = logs.describe_log_groups(nextToken=response['nextToken'])
-        log_groups += response['logGroups']
+    while 'nextToken' in response:        
+        try:
+            response = logs.describe_log_groups(nextToken=response['nextToken'])
+        except botocore.exceptions.ClientError as error:
+            logger.exception("Error describing log groups")
+            raise RuntimeError("Unable to fullfil request") from error  
+        except botocore.exceptions.ParamValidationError as error:
+            raise ValueError('The parameters you provided are incorrect: {}'.format(error))        
+    log_groups += response['logGroups']
 
     filtered_log_groups = []
     for log_group in log_groups:
         try:
             response = logs.describe_log_streams(logGroupName=log_group['logGroupName'], logStreamNamePrefix=log_stream_name, limit=1)
-            if len(response['logStreams']) > 0:
-                filtered_log_groups.append(log_group['logGroupName'])
         except botocore.exceptions.ClientError as error:
             logger.exception("Error describing Log Groups")
             raise RuntimeError("Unable to fullfil request") from error  
         except botocore.exceptions.ParamValidationError as error:
-            raise ValueError('The parameters you provided are incorrect: {}'.format(error))            
-
+            raise ValueError('The parameters you provided are incorrect: {}'.format(error))         
+        if len(response['logStreams']) > 0:
+            filtered_log_groups.append(log_group['logGroupName'])                   
     return filtered_log_groups
     
 @tracer.capture_method
@@ -164,9 +190,17 @@ def check_log_group_exists(log_group_name, region):
     - A boolean value indicating whether the log group exists (True) or not (False).
     """    
     client = boto3.client('logs', region_name=region)
-    response = client.describe_log_groups(
-        logGroupNamePrefix=log_group_name
-    )
+
+    try:
+        response = client.describe_log_groups(
+            logGroupNamePrefix=log_group_name
+        )
+    except botocore.exceptions.ClientError as error:
+        logger.exception("Error describing log groups")
+        raise RuntimeError("Unable to fullfil request") from error  
+    except botocore.exceptions.ParamValidationError as error:
+        raise ValueError('The parameters you provided are incorrect: {}'.format(error))          
+
     if len(response['logGroups']) == 0:
         return False
     else:
