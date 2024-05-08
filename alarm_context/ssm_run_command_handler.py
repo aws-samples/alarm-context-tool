@@ -49,14 +49,18 @@ def process_ssm_run_command(metric_name, dimensions, region, account_id, namespa
 
         # Failed Commands
         try:
-            response_failed = ssm_client.list_commands(
+            paginator = ssm_client.get_paginator('list_commands')
+            commands_list = []
+            for page in paginator.paginate(
                 Filters=[
                     {'key': 'Status', 'value': 'Failed'},
                     {'key': 'InvokedBefore', 'value': change_time_str},
                     {'key': 'InvokedAfter', 'value': start_time_str}
-                ],
-                MaxResults=50
-            )
+                ]               
+            ):
+                commands_list.extend(page['Commands'])
+            response_failed = {'Commands': commands_list} 
+
         except botocore.exceptions.ClientError as error:
             logger.exception("Error getting failed SSM commands")
             raise RuntimeError("Unable to fullfil request") from error  
@@ -65,14 +69,17 @@ def process_ssm_run_command(metric_name, dimensions, region, account_id, namespa
 
         # Timed Out Commands
         try:
-            response_timed_out = ssm_client.list_commands(
+            paginator = ssm_client.get_paginator('list_commands')
+            commands_list = []
+            for page in paginator.paginate(
                 Filters=[
                     {'key': 'Status', 'value': 'TimedOut'},
                     {'key': 'InvokedBefore', 'value': change_time_str},
                     {'key': 'InvokedAfter', 'value': start_time_str}
-                ],
-                MaxResults=50
-            )
+                ]               
+            ):
+                commands_list.extend(page['Commands'])
+            response_timed_out = {'Commands': commands_list}             
         except botocore.exceptions.ClientError as error:
             logger.exception("Error getting timed out SSM commands")
             raise RuntimeError("Unable to fullfil request") from error  
@@ -81,7 +88,6 @@ def process_ssm_run_command(metric_name, dimensions, region, account_id, namespa
 
         # Add commands together  
         commands = response_failed['Commands'] + response_timed_out['Commands']
-
 
         items_list = []
         for command in commands:
