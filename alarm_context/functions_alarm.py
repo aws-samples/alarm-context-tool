@@ -20,12 +20,15 @@ def get_alarm_history(region, alarm_name):
     """
     cloudwatch = boto3.client('cloudwatch', region_name=region)
     try:
-        response = cloudwatch.describe_alarm_history(
+        paginator = cloudwatch.get_paginator('describe_alarm_history')
+        alarm_history_items = []
+        for page in paginator.paginate(
             AlarmName=alarm_name,
             HistoryItemType='StateUpdate',
-            MaxRecords=100,
             ScanBy='TimestampDescending'
-         )    
+        ):
+            alarm_history_items.extend(page['AlarmHistoryItems'])
+        response = {'AlarmHistoryItems': alarm_history_items}        
     except botocore.exceptions.ClientError as error:
         logger.exception("Error getting alarm history data")
         raise RuntimeError("Unable to fullfil request") from error  

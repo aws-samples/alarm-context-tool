@@ -39,7 +39,7 @@ def get_log_insights_link(log_input, log_insights_query, region, start_time, end
     elif isinstance(log_input, dict):
         if 'logStreamName' in log_input:
             log_stream_name = log_input['logStreamName']
-            log_groups = search_log_groups(log_stream_name)
+            log_groups = search_log_groups(log_stream_name, region)
             log_insights_log_groups = ''
             for log_group in log_groups:
                 log_insights_log_groups += "~'"
@@ -68,11 +68,10 @@ def get_last_10_events(log_input, timestamp, region):
         html_table (str): A string containing an HTML table with the last 10 log events for the specified log stream.   
     """
     html_table = ''
-    global logs
     logs = boto3.client('logs', region_name=region)
     if 'logStreamName' in log_input:
         log_stream_name = log_input['logStreamName']
-        log_groups = search_log_groups(log_stream_name)
+        log_groups = search_log_groups(log_stream_name, region)
         log_events = []
         for log_group in log_groups:
             try:
@@ -115,7 +114,7 @@ def get_last_10_events(log_input, timestamp, region):
         
         log_events = response['events']
         
-        if not log_events or len(log_events) == 0:
+        if not log_events:
             html_table += '<table id="info"width="640" style="max-width:640px !important; border-collapse: collapse; margin-bottom:10px;" cellpadding="2" cellspacing="0" width="100%" align="center" border="0">'
             html_table += f'<tr><th colspan="2">Log group: {log_group_name}<br>Log stream: N/A</th></tr>'
             html_table += '<tr><th>Timestamp</th><th>Message</th></tr>'
@@ -135,7 +134,7 @@ def get_last_10_events(log_input, timestamp, region):
     return html_table, log_events
 
 @tracer.capture_method
-def search_log_groups(log_stream_name):
+def search_log_groups(log_stream_name, region):
     """
     Searches for all log groups that contain a given log stream name and returns the filtered list of log group names.
     
@@ -145,9 +144,14 @@ def search_log_groups(log_stream_name):
     Returns:
     
     A list of log group names that contain the given log stream name.
-    """    
+    """   
+    logs = boto3.client('logs', region_name=region) 
     try:
-        response = logs.describe_log_groups()
+        paginator = logs.get_paginator('describe_log_groups')
+        log_groups_list = []
+        for page in paginator.paginate():
+            log_groups_list.extend(page['logGroups'])
+        response = {'logGroups': log_groups_list}        
     except botocore.exceptions.ClientError as error:
         logger.exception("Error describing log groups")
         raise RuntimeError("Unable to fullfil request") from error  
@@ -155,15 +159,7 @@ def search_log_groups(log_stream_name):
         raise ValueError('The parameters you provided are incorrect: {}'.format(error)) 
 
     log_groups = response['logGroups']
-    while 'nextToken' in response:        
-        try:
-            response = logs.describe_log_groups(nextToken=response['nextToken'])
-        except botocore.exceptions.ClientError as error:
-            logger.exception("Error describing log groups")
-            raise RuntimeError("Unable to fullfil request") from error  
-        except botocore.exceptions.ParamValidationError as error:
-            raise ValueError('The parameters you provided are incorrect: {}'.format(error))        
-    log_groups += response['logGroups']
+
 
     filtered_log_groups = []
     for log_group in log_groups:
@@ -174,7 +170,7 @@ def search_log_groups(log_stream_name):
             raise RuntimeError("Unable to fullfil request") from error  
         except botocore.exceptions.ParamValidationError as error:
             raise ValueError('The parameters you provided are incorrect: {}'.format(error))         
-        if len(response['logStreams']) > 0:
+        if response['logStreams']:
             filtered_log_groups.append(log_group['logGroupName'])                   
     return filtered_log_groups
     
@@ -189,19 +185,21 @@ def check_log_group_exists(log_group_name, region):
     Returns:
     - A boolean value indicating whether the log group exists (True) or not (False).
     """    
-    client = boto3.client('logs', region_name=region)
+    logs = boto3.client('logs', region_name=region)
 
     try:
-        response = client.describe_log_groups(
-            logGroupNamePrefix=log_group_name
-        )
+        paginator = logs.get_paginator('describe_log_groups')
+        log_groups_list = []
+        for page in paginator.paginate(logGroupNamePrefix=log_group_name):
+            log_groups_list.extend(page['logGroups'])
+        response = {'logGroups': log_groups_list}        
     except botocore.exceptions.ClientError as error:
         logger.exception("Error describing log groups")
         raise RuntimeError("Unable to fullfil request") from error  
     except botocore.exceptions.ParamValidationError as error:
         raise ValueError('The parameters you provided are incorrect: {}'.format(error))          
 
-    if len(response['logGroups']) == 0:
+    if not response['logGroups']:
         return False
     else:
         return True    

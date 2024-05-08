@@ -37,7 +37,7 @@ def process_api_gateway(dimensions, region, account_id, namespace, change_time, 
                     "stat": "Average",
                     "period": 60,
                     "metrics": [
-                        [namespace, "IntegrationLatency", "ApiName", api_name, "ApiStage", api_stage]
+                        [namespace, "IntegrationLatency", "ApiName", api_name, "Stage", api_stage]
                     ]
                 },
                 {
@@ -47,7 +47,7 @@ def process_api_gateway(dimensions, region, account_id, namespace, change_time, 
                     "stat": "Average",
                     "period": 60,
                     "metrics": [
-                        [namespace, "Latency", "ApiName", api_name, "ApiStage", api_stage]
+                        [namespace, "Latency", "ApiName", api_name, "Stage", api_stage]
                     ]
                 },
                 {
@@ -57,7 +57,7 @@ def process_api_gateway(dimensions, region, account_id, namespace, change_time, 
                     "stat": "Sum",
                     "period": 60,
                     "metrics": [
-                        [namespace, "5XXError", "ApiName", api_name, "ApiStage", api_stage]
+                        [namespace, "5XXError", "ApiName", api_name, "Stage", api_stage]
                     ]
                 },
                 {
@@ -67,7 +67,7 @@ def process_api_gateway(dimensions, region, account_id, namespace, change_time, 
                     "stat": "SampleCount",
                     "period": 60,
                     "metrics": [
-                        [namespace, "Count", "ApiName", api_name, "ApiStage", api_stage]
+                        [namespace, "Count", "ApiName", api_name, "Stage", api_stage]
                     ]
                 },
                 {
@@ -77,7 +77,7 @@ def process_api_gateway(dimensions, region, account_id, namespace, change_time, 
                     "stat": "Sum",
                     "period": 60,
                     "metrics": [
-                        [namespace, "4XXError", "ApiName", api_name, "ApiStage", api_stage]
+                        [namespace, "4XXError", "ApiName", api_name, "Stage", api_stage]
                     ]
                 }
             ]
@@ -140,17 +140,19 @@ def process_api_gateway(dimensions, region, account_id, namespace, change_time, 
         api_gateway = boto3.client('apigateway', region_name=region)
 
         if api_name:
-            # Get API Gateway ID using API Name          
-            # Add paginator for get_rest_apis
-            try:
-                response = api_gateway.get_rest_apis()
+            try:                
+                paginator = api_gateway.get_paginator('get_rest_apis')
+                apis_list = []
+                for page in paginator.paginate():
+                    apis_list.extend(page['items'])
+                response = {'items': apis_list}
             except botocore.exceptions.ClientError as error:
                 logger.exception("Error getting rest apis")
                 raise RuntimeError("Unable to fullfil request") from error  
             except botocore.exceptions.ParamValidationError as error:
                 raise ValueError('The parameters you provided are incorrect: {}'.format(error))
-            apis_list = response['items']
-            api_id = next((api['id'] for api in apis_list if api['name'] == api_name), None)
+            
+            api_id = next((api['id'] for api in response['items'] if api['name'] == api_name), None)
                                 
         if api_id:
             try:

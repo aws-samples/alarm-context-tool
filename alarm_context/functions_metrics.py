@@ -81,7 +81,7 @@ def generate_metric_widget(metrics, annotation_time, start_time, end_time, regio
         )
 
         # Get the most recent data point value
-        if 'MetricDataResults' in metric_data and len(metric_data['MetricDataResults']) > 0 and metric_data['MetricDataResults'][0]['Values'] and len(metric_data['MetricDataResults'][0]['Values']) > 0:
+        if 'MetricDataResults' in metric_data and metric_data['MetricDataResults'] and metric_data['MetricDataResults'][0]['Values']:
             last_value = metric_data['MetricDataResults'][0]['Values'][0]
         else:
             last_value = '- -' # or any other default value
@@ -315,24 +315,23 @@ def get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, regi
 
             query_id_counter += 1
 
+        cloudwatch = boto3.client('cloudwatch', region_name=region)
         # Fetch metric data for the current set of widget queries
-        try:
-            response = boto3.client('cloudwatch', region_name=region).get_metric_data(
+        try:            
+            paginator = cloudwatch.get_paginator('get_metric_data')
+            metric_data_results = []
+            for page in paginator.paginate(
                 MetricDataQueries=widget_metric_data_queries,
                 StartTime=metric_data_start_time,
-                EndTime=end_time_formatted
-            )
+                EndTime=end_time_formatted                
+            ):
+                metric_data_results.extend(page['MetricDataResults'])
+            response = {'MetricDataResults': metric_data_results}              
         except botocore.exceptions.ClientError as error:
             logger.exception("Error getting metric data")
             raise RuntimeError("Unable to fullfil request") from error  
         except botocore.exceptions.ParamValidationError as error:
-            raise ValueError('The parameters you provided are incorrect: {}'.format(error))
-            
-        # Log the entire metrics object as part of a structured log message
-        logger.info({
-            "message": "Logging metrics for visualization",
-            "metrics": response
-        })        
+            raise ValueError('The parameters you provided are incorrect: {}'.format(error))      
 
         # Enrich and clean the metric data results
         for metric_data_result in response.get('MetricDataResults', []):
@@ -510,11 +509,15 @@ def get_metric_data(region, trigger, metric_name, account_id, change_time, end_t
     cloudwatch = boto3.client('cloudwatch', region_name=region)
     
     try:
-        response = cloudwatch.get_metric_data(
+        paginator = cloudwatch.get_paginator('get_metric_data')
+        metric_data_results = []
+        for page in paginator.paginate(
             MetricDataQueries=metric_data_queries,
             StartTime=metric_data_start_time,
-            EndTime=end_time
-        )
+            EndTime=end_time                
+        ):
+            metric_data_results.extend(page['MetricDataResults'])
+        response = {'MetricDataResults': metric_data_results}         
     except botocore.exceptions.ClientError as error:
         logger.exception("Error getting metric data")
         raise RuntimeError("Unable to fulfill request") from error  
