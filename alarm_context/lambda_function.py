@@ -18,6 +18,7 @@
 # x-ray still needs some debugging - DONE
 # update test case function - DONE, COULD IMPROVE
 # AWS Health - DONE
+# Alarms created with Metric Insights queries will not have a namespace or dimensions
 
 import boto3
 import json
@@ -95,8 +96,7 @@ def alarm_handler(event, context):
     period = message['Trigger']['Period']
 
     # Get array of metrics and variables for first metric
-    namespace, metric_name, statistic, dimensions, metrics_array = get_metric_array(
-        message['Trigger'])
+    namespace, metric_name, statistic, dimensions, metrics_array = get_metric_array(message['Trigger'])
 
     # Add annotations to trace for Namespace and dimensions
     tracer.put_annotation(key="Namespace", value=namespace)
@@ -179,7 +179,7 @@ def alarm_handler(event, context):
         response = s3_handler.process_s3(metric_name, dimensions, region, account_id,
                                          namespace, change_time, annotation_time, start_time, end_time, start, end)
 
-    elif namespace in ("ContainerInsights"):
+    elif namespace == "ContainerInsights":
         response = eks_handler.process_eks(metric_name, dimensions, region, account_id,
                                            namespace, change_time, annotation_time, start_time, end_time, start, end)
 
