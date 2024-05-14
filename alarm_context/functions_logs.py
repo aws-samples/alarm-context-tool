@@ -2,7 +2,10 @@ import boto3
 import botocore
 
 import datetime
+from datetime import timedelta
+import time
 import urllib.parse
+import pandas as pd
 
 from aws_lambda_powertools import Logger
 from aws_lambda_powertools import Tracer
@@ -54,6 +57,78 @@ def get_log_insights_link(log_input, log_insights_query, region, start_time, end
     encoded_log_insights_query_asterisks = encoded_log_insights_query.replace("%","*")
     log_insights_link = f"https://{region}.console.aws.amazon.com/cloudwatch/home?region={region}#logsV2:logs-insights$3FqueryDetail$3D~(end~'{end_time_str}~start~'{start_time_str}~timeType~'ABSOLUTE~tz~'Local~editorString~'{encoded_log_insights_query_asterisks}~source~({log_insights_log_groups}))"
     return log_insights_link
+
+@tracer.capture_method
+def get_log_insights_query_results(log_group, log_insights_query, region):
+    """
+    Retrieves the results of a CloudWatch Logs Insights query for a given log group.
+
+    Args:
+        log_group (str): The name of the log group to query.
+        log_insights_query (str): The query to execute on the logs.
+        region (str): The AWS region of the logs.
+
+    Returns:
+        log_insights_query_results_html
+        log_insights_query_results_json
+    """
+
+    logs = boto3.client('logs', region_name=region)
+
+    try:
+        start_query_response = logs.start_query(
+            logGroupName=log_group,
+            startTime=int((datetime.datetime.today() - timedelta(hours=3)).timestamp()),
+            endTime=int(datetime.datetime.now().timestamp()),
+            queryString=log_insights_query,
+        )
+    except botocore.exceptions.ClientError as error:
+        logger.exception("Error starting query")
+        raise RuntimeError("Unable to fullfil request") from error  
+    except botocore.exceptions.ParamValidationError as error:
+        raise ValueError('The parameters you provided are incorrect: {}'.format(error)) 
+
+    query_id = start_query_response['queryId']
+
+    response = None
+
+    while response is None or response['status'] == 'Running':
+        time.sleep(1)
+        try:
+            response = logs.get_query_results(
+                queryId=query_id
+            )
+        except botocore.exceptions.ClientError as error:
+            logger.exception("Error starting query")
+            raise RuntimeError("Unable to fullfil request") from error  
+        except botocore.exceptions.ParamValidationError as error:
+            raise ValueError('The parameters you provided are incorrect: {}'.format(error)) 
+    
+    log_insights_query_results_json = response['results']
+
+    # Step 1: Extract all unique field names
+    fields = set()
+    for result in log_insights_query_results_json:
+        for entry in result:
+            fields.add(entry['field'])
+
+    # Step 2: Construct rows
+    rows = []
+    for result in log_insights_query_results_json:
+        row = {field: '' for field in fields}  # Initialize all fields with empty string
+        for entry in result:
+            row[entry['field']] = entry['value']
+        rows.append(row)
+
+    # Step 3: Create DataFrame
+    df = pd.DataFrame(rows)
+
+    # Step 4: Convert DataFrame to HTML table
+    log_insights_query_results_html = df.to_html(index=False, escape=False)
+
+
+    return log_insights_query_results_html, log_insights_query_results_json
+
 
 @tracer.capture_method
 def get_last_10_events(log_input, timestamp, region):

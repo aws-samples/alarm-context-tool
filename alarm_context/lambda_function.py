@@ -19,13 +19,14 @@
 # update test case function - DONE, COULD IMPROVE
 # AWS Health - DONE
 # Alarms created with Metric Insights queries will not have a namespace or dimensions
+# Add Log Insights Queries - Done
+# Look at each handler to see where they can be used
 
 import boto3
 import json
 import os
 import datetime
 import base64
-import botocore
 
 import sns_handler
 import ec2_handler
@@ -93,7 +94,6 @@ def alarm_handler(event, context):
     state_change_time = message['StateChangeTime']
     alarm_arn = message['AlarmArn']
     region_name = message['Region']
-    period = message['Trigger']['Period']
 
     # Get array of metrics and variables for first metric
     namespace, metric_name, statistic, dimensions, metrics_array = get_metric_array(message['Trigger'])
@@ -227,12 +227,10 @@ def alarm_handler(event, context):
         log_information = response.get("log_information")
         log_events = response.get("log_events")
         resource_information = response.get("resource_information")
-        resource_information_object = response.get(
-            "resource_information_object")
+        resource_information_object = response.get("resource_information_object")
         notifications = response.get("notifications")
         widget_images = response.get("widget_images")
-        additional_metrics_with_timestamps_removed = response.get(
-            "additional_metrics_with_timestamps_removed")
+        additional_metrics_with_timestamps_removed = response.get("additional_metrics_with_timestamps_removed")
         trace_summary = response.get("trace_summary")
         trace_html = response.get("trace")
         tags = response.get("tags", [])
@@ -247,8 +245,7 @@ def alarm_handler(event, context):
             additional_information += resource_information
 
     # Get main widget
-    graph = generate_main_metric_widget(
-        metrics_array, annotation_time, region, start_time, end_time)
+    graph = generate_main_metric_widget(metrics_array, annotation_time, region, start_time, end_time)
 
     # Get metric data
     metric_data = get_metric_data(region, message['Trigger'], metric_name, account_id, change_time, end_time)
@@ -265,8 +262,7 @@ def alarm_handler(event, context):
             health_events = describe_events(region)
             restart_workflow = False
         except ActiveRegionHasChangedError as are:
-            logger.info(
-                "The AWS Health API active region has changed. Restarting the workflow using the new active region!, %s", are)
+            logger.info("The AWS Health API active region has changed. Restarting the workflow using the new active region!, %s", are)
         except:
             health_events = None
             restart_workflow = False

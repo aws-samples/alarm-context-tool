@@ -8,6 +8,8 @@ from functions_xray import process_traces
 from functions_metrics import build_dashboard
 from functions_metrics import get_metrics_from_dashboard_metrics
 from functions import get_information_panel
+from functions_logs import get_log_insights_query_results
+from functions_logs import check_log_group_exists
 
 from aws_lambda_powertools import Logger
 from aws_lambda_powertools import Tracer
@@ -132,10 +134,22 @@ def process_eks(metric_name, dimensions, region, account_id, namespace, change_t
 
             # Get Tags
             tags = response['cluster'].get('tags', None)   
+
+            # Get Errors from Logs            
+            log_group = f"/aws/eks/{cluster_name}/cluster"
+            if check_log_group_exists(log_group, region):
+                log_insights_query = """filter @logStream like /^kube-controller-manager-/
+                                        | filter @message like /Error/
+                                        | fields @logStream, @timestamp, @message
+                                        | sort @timestamp desc
+                                        | limit 10
+                                        """
+                log_information, log_events = get_log_insights_query_results(log_group, log_insights_query, region)    
+
         else:
             resource_information = None            
-            resource_information_object = None    
-            tags = None                               
+            resource_information_object = None
+            tags = None
 
         # ClusterName, ContainerName, FullPodName, Namespace, PodName
         if cluster_name and container_name and full_pod_name and eks_namespace and pod_name:
@@ -174,8 +188,6 @@ def process_eks(metric_name, dimensions, region, account_id, namespace, change_t
             widget_images.extend(build_dashboard(dashboard_metrics, annotation_time, start, end, region))
             additional_metrics_with_timestamps_removed.extend(get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, region))  
                   
-            log_information = None
-            log_events = None           
             trace_summary = None
             trace = None            
             notifications = None
@@ -216,12 +228,9 @@ def process_eks(metric_name, dimensions, region, account_id, namespace, change_t
             widget_images.extend(build_dashboard(dashboard_metrics, annotation_time, start, end, region))
             additional_metrics_with_timestamps_removed.extend(get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, region))  
                   
-            log_information = None
-            log_events = None           
             trace_summary = None
             trace = None            
             notifications = None
-            tags = None                                                  
 
         # ClusterName, FullPodName, Namespace, PodName
         elif cluster_name and full_pod_name and eks_namespace and pod_name:
@@ -269,12 +278,9 @@ def process_eks(metric_name, dimensions, region, account_id, namespace, change_t
             logger.info(f"dashboard_metrics: {dashboard_metrics}")
             additional_metrics_with_timestamps_removed.extend(get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, region))  
                   
-            log_information = None
-            log_events = None           
             trace_summary = None
             trace = None            
             notifications = None
-            tags = None    
 
         # ClusterName, InstanceId, NodeName
         elif cluster_name and instance_id and node_name:
@@ -313,8 +319,6 @@ def process_eks(metric_name, dimensions, region, account_id, namespace, change_t
             widget_images.extend(build_dashboard(dashboard_metrics, annotation_time, start, end, region))
             additional_metrics_with_timestamps_removed.extend(get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, region))
 
-            log_information = None
-            log_events = None
             trace_summary = None
             trace = None
             notifications = None
@@ -362,12 +366,9 @@ def process_eks(metric_name, dimensions, region, account_id, namespace, change_t
             widget_images.extend(build_dashboard(dashboard_metrics, annotation_time, start, end, region))
             additional_metrics_with_timestamps_removed.extend(get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, region))
 
-            log_information = None
-            log_events = None
             trace_summary = None
             trace = None
             notifications = None
-            tags = None    
 
         # ClusterName, Namespace, Service
         elif cluster_name and eks_namespace and service:
@@ -406,12 +407,9 @@ def process_eks(metric_name, dimensions, region, account_id, namespace, change_t
             widget_images.extend(build_dashboard(dashboard_metrics, annotation_time, start, end, region))
             additional_metrics_with_timestamps_removed.extend(get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, region))
 
-            log_information = None
-            log_events = None
             trace_summary = None
             trace = None
             notifications = None
-            tags = None            
 
         # ClusterName, code, method
         # Codes: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#http-status-codes
@@ -461,12 +459,9 @@ def process_eks(metric_name, dimensions, region, account_id, namespace, change_t
             widget_images.extend(build_dashboard(dashboard_metrics, annotation_time, start, end, region))
             additional_metrics_with_timestamps_removed.extend(get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, region))
 
-            log_information = None
-            log_events = None
             trace_summary = None
             trace = None
             notifications = None
-            tags = None 
 
         # ClusterName, code, verb
         elif cluster_name and code and verb:
@@ -515,12 +510,9 @@ def process_eks(metric_name, dimensions, region, account_id, namespace, change_t
             widget_images.extend(build_dashboard(dashboard_metrics, annotation_time, start, end, region))
             additional_metrics_with_timestamps_removed.extend(get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, region))
 
-            log_information = None
-            log_events = None
             trace_summary = None
             trace = None
             notifications = None
-            tags = None 
 
         # ClusterName, Namespace
         elif cluster_name and eks_namespace:
@@ -560,24 +552,18 @@ def process_eks(metric_name, dimensions, region, account_id, namespace, change_t
             widget_images.extend(build_dashboard(dashboard_metrics, annotation_time, start, end, region))
             additional_metrics_with_timestamps_removed.extend(get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, region))
 
-            log_information = None
-            log_events = None
             trace_summary = None
             trace = None
             notifications = None
-            tags = None         
 
         # ClusterName, endpoint
         elif cluster_name and endpoint:
             # There is only on metric name
             widget_images = None
             additional_metrics_with_timestamps_removed = None
-            log_information = None
-            log_events = None
             trace_summary = None
             trace = None
             notifications = None
-            tags = None  
 
         # ClusterName, operation
         elif cluster_name and operation:
@@ -612,12 +598,9 @@ def process_eks(metric_name, dimensions, region, account_id, namespace, change_t
             widget_images.extend(build_dashboard(dashboard_metrics, annotation_time, start, end, region))
             additional_metrics_with_timestamps_removed.extend(get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, region))
 
-            log_information = None
-            log_events = None
             trace_summary = None
             trace = None
             notifications = None
-            tags = None   
         
         # ClusterName, priority_level
         elif cluster_name and priority_level:
@@ -658,8 +641,6 @@ def process_eks(metric_name, dimensions, region, account_id, namespace, change_t
             widget_images.extend(build_dashboard(dashboard_metrics, annotation_time, start, end, region))
             additional_metrics_with_timestamps_removed.extend(get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, region))  
                   
-            log_information = None
-            log_events = None           
             trace_summary = None
             trace = None            
             notifications = None            
@@ -695,12 +676,9 @@ def process_eks(metric_name, dimensions, region, account_id, namespace, change_t
             widget_images.extend(build_dashboard(dashboard_metrics, annotation_time, start, end, region))
             additional_metrics_with_timestamps_removed.extend(get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, region))
 
-            log_information = None
-            log_events = None
             trace_summary = None
             trace = None
             notifications = None
-            tags = None   
 
         #ClusterName, resource
         elif cluster_name and resource:
@@ -734,12 +712,9 @@ def process_eks(metric_name, dimensions, region, account_id, namespace, change_t
             widget_images.extend(build_dashboard(dashboard_metrics, annotation_time, start, end, region))
             additional_metrics_with_timestamps_removed.extend(get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, region))
 
-            log_information = None
-            log_events = None
             trace_summary = None
             trace = None
             notifications = None
-            tags = None 
 
         # ClusterName, verb
         elif cluster_name and verb:
@@ -772,12 +747,13 @@ def process_eks(metric_name, dimensions, region, account_id, namespace, change_t
             widget_images.extend(build_dashboard(dashboard_metrics, annotation_time, start, end, region))
             additional_metrics_with_timestamps_removed.extend(get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, region))
 
-            log_information = None
-            log_events = None
             trace_summary = None
             trace = None
             notifications = None
-            tags = None 
+
+        # ClusterName
+        elif cluster_name:
+            pass
 
         else:
             # Should not get here
@@ -794,7 +770,7 @@ def process_eks(metric_name, dimensions, region, account_id, namespace, change_t
         trace_summary = None
         trace = None
         notifications = None
-        tags = None          
+        tags = None
     else:
         contextual_links = None
         log_information = None
