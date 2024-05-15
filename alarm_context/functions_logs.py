@@ -126,6 +126,9 @@ def get_log_insights_query_results(log_group, log_insights_query, region):
     # Step 4: Convert DataFrame to HTML table
     log_insights_query_results_html = df.to_html(index=False, escape=False)
 
+    # Adjust the table
+    new_table_tag = '<table id="info" width="640" style="max-width:640px !important; border-collapse: collapse; margin-bottom:10px;" cellpadding="2" cellspacing="0" width="100%" align="center" border="0">'
+    log_insights_query_results_html = log_insights_query_results_html.replace('<table border="1" class="dataframe">', new_table_tag)    
 
     return log_insights_query_results_html, log_insights_query_results_json
 

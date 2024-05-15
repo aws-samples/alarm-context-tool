@@ -87,7 +87,6 @@ def process_traces(filter_expression, region, trace_start_time, trace_end_time):
     html_combined = html_combined.replace('<table border="1" class="dataframe">', new_table_tag)
     html_combined = html_combined.replace('<tr style="text-align: right;">','<tr>')
     html_combined = html_combined.replace('<thead>', f'<thead><tr><th colspan="3" style="text-align: center;">Resources in Trace</th></tr>')
-    logger.info("Combined Data", html=html_combined)
     
     # Extract the latest trace ID
     if response["TraceSummaries"]:
