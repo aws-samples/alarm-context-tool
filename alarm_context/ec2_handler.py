@@ -15,9 +15,10 @@ logger = Logger()
 tracer = Tracer()
 
 @tracer.capture_method
-def process_ec2(dimensions, region, account_id, namespace, change_time, annotation_time, start_time, end_time, start, end): 
+def process_ec2(metric_name, dimensions, region, account_id, namespace, change_time, annotation_time, start_time, end_time, start, end): 
     
     # Possible Dimensions: AutoScalingGroupName, ImageId, InstanceId, InstanceType
+    # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/viewing_metrics_with_cloudwatch.html#ec2-cloudwatch-dimensions
 
     if dimensions:
         dimension_values = {element['name']: element['value'] for element in dimensions}
@@ -315,7 +316,134 @@ def process_ec2(dimensions, region, account_id, namespace, change_time, annotati
             # No logs for a ASG
             log_information = None
             log_events = None
-            
+        
+        elif image_id:
+            ec2_automatic_dashboard_link = 'https://%s.console.aws.amazon.com/cloudwatch/home?region=%s#home:dashboards/EC2?~(alarmStateFilter~(~\'ALARM))' % (region, region)   
+            contextual_links = get_dashboard_button("EC2 automatic dashboard" , ec2_automatic_dashboard_link)    
+            ec2_service_link =f"https://{region}.console.aws.amazon.com/ec2/home?region={region}#Instances:imageId={image_id}"
+            ec2_service_title = '<b>EC2 Console:</b> %s' % (str(image_id))
+            contextual_links += get_dashboard_button(ec2_service_title, ec2_service_link)            
+            ami_link = f"https://{region}.console.aws.amazon.com/ec2/home?region={region}#ImageDetails:imageId={image_id}"
+            contextual_links += get_dashboard_button("AMI Details" , ami_link)  
+
+            dashboard_metrics = [
+                {
+                    "title": "CPU Utilization",
+                    "view": "timeSeries",
+                    "stacked": False,
+                    "stat": "Average",
+                    "period": 60,
+                    "metrics": [
+                        [namespace, "CPUUtilization", "ImageId", image_id]
+                    ]
+                },                    
+                {
+                    "title": "Network",
+                    "view": "timeSeries",
+                    "stacked": False,
+                    "stat": "Average",
+                    "period": 60,
+                    "metrics": [
+                        [namespace, "NetworkIn", "ImageId", image_id, {"label": "Network In", "color": "#0073BB"}],
+                        [namespace, "NetworkOut", "ImageId", image_id, {"label": "Network Out", "color": "#E02020"}]
+                    ]
+                },
+                {
+                    "title": "EBS",
+                    "view": "timeSeries",
+                    "stacked": False,
+                    "stat": "Average",
+                    "period": 60,
+                    "metrics": [
+                        [namespace, "EBSReadBytes", "ImageId", image_id, {"label": "EBS Read Bytes", "color": "#0073BB"}],
+                        [namespace, "EBSWriteBytes", "ImageId", image_id, {"label": "EBS Write Bytes", "color": "#E02020"}]
+                    ]
+                }
+            ]
+            widget_images = build_dashboard(dashboard_metrics, annotation_time, start, end, region) 
+            additional_metrics_with_timestamps_removed = get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, region)   
+
+            # Describe AMIs
+            ec2 = boto3.client('ec2', region_name=region)  
+            try:
+                response = ec2.describe_images(
+                    ImageIds=[
+                        image_id
+                    ],
+                    IncludeDeprecated=True,
+                    IncludeDisabled=True
+                )  
+            except botocore.exceptions.ClientError as error:
+                logger.exception("Error describing AMIs")
+                raise RuntimeError("Unable to fullfil request") from error  
+            except botocore.exceptions.ParamValidationError as error:
+                raise ValueError('The parameters you provided are incorrect: {}'.format(error))            
+                           
+            image = response['Images'][0]
+        
+            resource_information = get_html_table("AMI: " +image_id, image)
+            resource_information_object = image
+            tags = image.get('Tags', None)    
+
+            log_information = None
+            log_events = None   
+            trace_summary = None
+            trace = None            
+
+        elif instance_type:
+            ec2_automatic_dashboard_link = 'https://%s.console.aws.amazon.com/cloudwatch/home?region=%s#home:dashboards/EC2?~(alarmStateFilter~(~\'ALARM))' % (region, region)   
+            contextual_links = get_dashboard_button("EC2 automatic dashboard" , ec2_automatic_dashboard_link)    
+            ec2_metrics_link = f"https://{region}.console.aws.amazon.com/cloudwatch/home?region={region}#resource-health:ec2/map?~(leadingMetric~'*22cpu-utilization*22~filterBy~'*7b*22instanceType*22*3a*5b*22{instance_type}*22*5d*7d)"
+            contextual_links += get_dashboard_button("Resource Health Dashboard: %s" % (instance_type), ec2_metrics_link) 
+            ec2_service_link = f"https://{region}.console.aws.amazon.com/ec2/home?region={region}#Instances:instanceTypeFilter={instance_type}"
+            ec2_service_title = '<b>EC2 Console:</b> %s' % (str(instance_type))
+            contextual_links += get_dashboard_button(ec2_service_title, ec2_service_link)
+                              
+            dashboard_metrics = [
+                {
+                    "title": "CPU Utilization",
+                    "view": "timeSeries",
+                    "stacked": False,
+                    "stat": "Average",
+                    "period": 60,
+                    "metrics": [
+                        [namespace, "CPUUtilization", "InstanceType", instance_type]
+                    ]
+                },                    
+                {
+                    "title": "Network",
+                    "view": "timeSeries",
+                    "stacked": False,
+                    "stat": "Average",
+                    "period": 60,
+                    "metrics": [
+                        [namespace, "NetworkIn", "InstanceType", instance_type, {"label": "Network In", "color": "#0073BB"}],
+                        [namespace, "NetworkOut", "InstanceType", instance_type, {"label": "Network Out", "color": "#E02020"}]
+                    ]
+                },
+                {
+                    "title": "EBS",
+                    "view": "timeSeries",
+                    "stacked": False,
+                    "stat": "Average",
+                    "period": 60,
+                    "metrics": [
+                        [namespace, "EBSReadBytes", "InstanceType", instance_type, {"label": "EBS Read Bytes", "color": "#0073BB"}],
+                        [namespace, "EBSWriteBytes", "InstanceType", instance_type, {"label": "EBS Write Bytes", "color": "#E02020"}]
+                    ]
+                }
+            ]
+            widget_images = build_dashboard(dashboard_metrics, annotation_time, start, end, region) 
+            additional_metrics_with_timestamps_removed = get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, region) 
+
+            log_information = None
+            log_events = None
+            resource_information = None
+            resource_information_object = None
+            trace_summary = None
+            trace = None   
+            tags = None         
+    
         else:
             contextual_links = None
             log_information = None
@@ -328,7 +456,61 @@ def process_ec2(dimensions, region, account_id, namespace, change_time, annotati
             trace = None
             notifications = None
             tags = None
-    
+
+    elif metric_name:    
+        ec2_automatic_dashboard_link = 'https://%s.console.aws.amazon.com/cloudwatch/home?region=%s#home:dashboards/EC2?~(alarmStateFilter~(~\'ALARM))' % (region, region)   
+        contextual_links = get_dashboard_button("EC2 automatic dashboard" , ec2_automatic_dashboard_link)    
+        ec2_metrics_link = f"https://{region}.console.aws.amazon.com/cloudwatch/home?region={region}#resource-health:ec2/map?~(showAlarms~'true)"
+        contextual_links += get_dashboard_button("Resource Health Dashboard", ec2_metrics_link) 
+        ec2_service_link = f"https://{region}.console.aws.amazon.com/ec2/home?region={region}#Instances:instanceState=running"
+        ec2_service_title = '<b>EC2 Console</b>'
+        contextual_links += get_dashboard_button(ec2_service_title, ec2_service_link)
+
+        dashboard_metrics = [
+            {
+                "title": "CPU Utilization",
+                "view": "timeSeries",
+                "stacked": False,
+                "stat": "Average",
+                "period": 60,
+                "metrics": [
+                    [namespace, "CPUUtilization"]
+                ]
+            },                    
+            {
+                "title": "Network",
+                "view": "timeSeries",
+                "stacked": False,
+                "stat": "Average",
+                "period": 60,
+                "metrics": [
+                    [namespace, "NetworkIn", {"label": "Network In", "color": "#0073BB"}],
+                    [namespace, "NetworkOut", {"label": "Network Out", "color": "#E02020"}]
+                ]
+            },
+            {
+                "title": "EBS",
+                "view": "timeSeries",
+                "stacked": False,
+                "stat": "Average",
+                "period": 60,
+                "metrics": [
+                    [namespace, "EBSReadBytes", {"label": "EBS Read Bytes", "color": "#0073BB"}],
+                    [namespace, "EBSWriteBytes", {"label": "EBS Write Bytes", "color": "#E02020"}]
+                ]
+            }
+        ]
+        widget_images = build_dashboard(dashboard_metrics, annotation_time, start, end, region) 
+        additional_metrics_with_timestamps_removed = get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, region) 
+
+        log_information = None
+        log_events = None
+        resource_information = None
+        resource_information_object = None
+        trace_summary = None
+        trace = None   
+        tags = None           
+
     return {
         "contextual_links": contextual_links,
         "log_information": log_information,

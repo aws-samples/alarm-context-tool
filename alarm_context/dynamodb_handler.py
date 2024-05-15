@@ -123,7 +123,7 @@ def process_dynamodb(dimensions, region, account_id, namespace, change_time, ann
                 raise ValueError('The parameters you provided are incorrect: {}'.format(error))            
             logger.info("DynamoDB Tags" , extra=response)
             resource_information += get_html_table_with_fields("DynamoDB Table Tags: " +id, response['Tags'])  
-            tags = response['Tags']
+            tags = response.get('Tags', None)
             
             # Get Trace information            
             filter_expression = f'!OK and service(id(name: "{id}", type: "AWS::DynamoDB::Table")) AND service(id(account.id: "{account_id}"))'

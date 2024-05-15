@@ -136,8 +136,7 @@ def alarm_handler(event, context):
     logger.info(dimensions)
 
     if namespace == "AWS/EC2":
-        response = ec2_handler.process_ec2(
-            dimensions, region, account_id, namespace, change_time, annotation_time, start_time, end_time, start, end)
+        response = ec2_handler.process_ec2(metric_name, dimensions, region, account_id, namespace, change_time, annotation_time, start_time, end_time, start, end)
 
     elif namespace == "CloudWatchSynthetics":
         response = synthetics_handler.process_synthetics(
