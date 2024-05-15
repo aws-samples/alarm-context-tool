@@ -88,6 +88,7 @@ Resources:
                 - rds:DescribeDBInstances
                 - pi:ListAvailableResourceMetrics
                 - pi:GetResourceMetrics
+                - eks:DescribeCluster
               Resource: "*"
             - Effect: Allow
               Action:

@@ -25,7 +25,11 @@ def get_alarm_history(region, alarm_name):
         for page in paginator.paginate(
             AlarmName=alarm_name,
             HistoryItemType='StateUpdate',
-            ScanBy='TimestampDescending'
+            ScanBy='TimestampDescending',
+            PaginationConfig={
+                'MaxItems': 10,
+                'PageSize': 10
+            }            
         ):
             alarm_history_items.extend(page['AlarmHistoryItems'])
         response = {'AlarmHistoryItems': alarm_history_items}        

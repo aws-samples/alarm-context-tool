@@ -423,7 +423,8 @@ def get_metric_array(trigger):
                         'namespace': namespace,
                         'dimensions': dimensions
                     })
-                else:                
+                else:      
+                    metric_name = expression  # This will store the whole expression          
                     metrics_array.append({
                         'type': 'Expression',
                         'id': metric['Id'],
@@ -431,8 +432,8 @@ def get_metric_array(trigger):
                         'label': metric.get('Label', '')
                     })
 
-    #if not namespace or not metric_name or not statistic:            
-    if not namespace or (not metric_name and not any('Expression' in m for m in metrics_array)):
+    # Check that the metrics array is not empty
+    if not metrics_array:    
         raise ValueError("Required metric details not found in Alarm message")
 
     return namespace, metric_name, statistic, dimensions, metrics_array

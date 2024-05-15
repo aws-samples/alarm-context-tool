@@ -33,9 +33,9 @@ def process_dynamodb(dimensions, region, account_id, namespace, change_time, ann
                     "stat": "Average",
                     "period": 60,
                     "metrics": [
-                        [ "AWS/DynamoDB", "ProvisionedReadCapacityUnits", "TableName", id, { "label": "Provisioned", "color": "#E02020", "region": "us-east-1" } ],
-                        [ "AWS/DynamoDB", "ConsumedReadCapacityUnits", "TableName", id, { "stat": "Sum", "id": "m1", "visible": False, "region": "us-east-1" } ],
-                        [ { "expression": "m1/PERIOD(m1)", "label": "Consumed", "id": "e1", "color": "#0073BB", "region": "us-east-1" } ]
+                        [ "AWS/DynamoDB", "ProvisionedReadCapacityUnits", "TableName", id, { "label": "Provisioned", "color": "#E02020", "region": region } ],
+                        [ "AWS/DynamoDB", "ConsumedReadCapacityUnits", "TableName", id, { "stat": "Sum", "id": "m1", "visible": False, "region": region } ],
+                        [ { "expression": "m1/PERIOD(m1)", "label": "Consumed", "id": "e1", "color": "#0073BB", "region": region } ]
                     ]
                 },
                 {
@@ -45,9 +45,9 @@ def process_dynamodb(dimensions, region, account_id, namespace, change_time, ann
                     "stat": "Average",
                     "period": 60,
                     "metrics": [
-                        [ "AWS/DynamoDB", "ProvisionedWriteCapacityUnits", "TableName", id, { "label": "Provisioned", "color": "#E02020", "region": "us-east-1" } ],
-                        [ "AWS/DynamoDB", "ConsumedWriteCapacityUnits", "TableName", id, { "stat": "Sum", "id": "m1", "visible": False, "region": "us-east-1" } ],
-                        [ { "expression": "m1/PERIOD(m1)", "label": "Consumed", "id": "e1", "color": "#0073BB", "region": "us-east-1" } ]
+                        [ "AWS/DynamoDB", "ProvisionedWriteCapacityUnits", "TableName", id, { "label": "Provisioned", "color": "#E02020", "region": region } ],
+                        [ "AWS/DynamoDB", "ConsumedWriteCapacityUnits", "TableName", id, { "stat": "Sum", "id": "m1", "visible": False, "region": region } ],
+                        [ { "expression": "m1/PERIOD(m1)", "label": "Consumed", "id": "e1", "color": "#0073BB", "region": region } ]
                     ]
                 },
                 {
@@ -57,10 +57,10 @@ def process_dynamodb(dimensions, region, account_id, namespace, change_time, ann
                     "stat": "Sum",
                     "period": 60,
                         "metrics": [
-                            [ "AWS/DynamoDB", "ThrottledRequests", "TableName", id, "Operation", "GetItem", { "color": "#0073BB", "region": "us-east-1" } ],
-                            [ "AWS/DynamoDB", "ThrottledRequests", "TableName", id, "Operation", "Scan", { "color": "#FF7F0F", "region": "us-east-1" } ],
-                            [ "AWS/DynamoDB", "ThrottledRequests", "TableName", id, "Operation", "Query", { "color": "#2DA02D", "region": "us-east-1" } ],
-                            [ "AWS/DynamoDB", "ThrottledRequests", "TableName", id, "Operation", "BatchGetItem", { "color": "#9468BD", "region": "us-east-1" } ]
+                            [ "AWS/DynamoDB", "ThrottledRequests", "TableName", id, "Operation", "GetItem", { "color": "#0073BB", "region": region } ],
+                            [ "AWS/DynamoDB", "ThrottledRequests", "TableName", id, "Operation", "Scan", { "color": "#FF7F0F", "region": region } ],
+                            [ "AWS/DynamoDB", "ThrottledRequests", "TableName", id, "Operation", "Query", { "color": "#2DA02D", "region": region } ],
+                            [ "AWS/DynamoDB", "ThrottledRequests", "TableName", id, "Operation", "BatchGetItem", { "color": "#9468BD", "region": region } ]
                         ]
                 },
                 {
@@ -70,7 +70,7 @@ def process_dynamodb(dimensions, region, account_id, namespace, change_time, ann
                     "stat": "Sum",
                     "period": 60,
                         "metrics": [
-                            [ "AWS/DynamoDB", "ReadThrottleEvents", "TableName", id, { "label": "Provisioned", "region": "us-east-1" } ]
+                            [ "AWS/DynamoDB", "ReadThrottleEvents", "TableName", id, { "label": "Provisioned", "region": region } ]
                         ]   
                 },
                 {
@@ -80,10 +80,10 @@ def process_dynamodb(dimensions, region, account_id, namespace, change_time, ann
                     "stat": "Sum",
                     "period": 60,
                     "metrics": [
-                        [ "AWS/DynamoDB", "ThrottledRequests", "TableName", id, "Operation", "PutItem", { "color": "#0073BB", "region": "us-east-1" } ],
-                        [ "AWS/DynamoDB", "ThrottledRequests", "TableName", id, "Operation", "UpdateItem", { "color": "#FF7F0F", "region": "us-east-1" } ],
-                        [ "AWS/DynamoDB", "ThrottledRequests", "TableName", id, "Operation", "DeleteItem", { "color": "#2DA02D", "region": "us-east-1" } ],
-                        [ "AWS/DynamoDB", "ThrottledRequests", "TableName", id, "Operation", "BatchWriteItem", { "color": "#9468BD", "region": "us-east-1" } ]
+                        [ "AWS/DynamoDB", "ThrottledRequests", "TableName", id, "Operation", "PutItem", { "color": "#0073BB", "region": region } ],
+                        [ "AWS/DynamoDB", "ThrottledRequests", "TableName", id, "Operation", "UpdateItem", { "color": "#FF7F0F", "region": region } ],
+                        [ "AWS/DynamoDB", "ThrottledRequests", "TableName", id, "Operation", "DeleteItem", { "color": "#2DA02D", "region": region } ],
+                        [ "AWS/DynamoDB", "ThrottledRequests", "TableName", id, "Operation", "BatchWriteItem", { "color": "#9468BD", "region": region } ]
                     ]
                 },
                 {
@@ -93,7 +93,7 @@ def process_dynamodb(dimensions, region, account_id, namespace, change_time, ann
                     "stat": "Sum",
                     "period": 60,
                     "metrics": [
-                        [ "AWS/DynamoDB", "WriteThrottleEvents", "TableName", id, { "label": "Provisioned", "region": "us-east-1" } ]
+                        [ "AWS/DynamoDB", "WriteThrottleEvents", "TableName", id, { "label": "Provisioned", "region": region } ]
                     ]
                 }                    
             ]

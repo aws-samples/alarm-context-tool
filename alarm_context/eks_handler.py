@@ -8,6 +8,8 @@ from functions_xray import process_traces
 from functions_metrics import build_dashboard
 from functions_metrics import get_metrics_from_dashboard_metrics
 from functions import get_information_panel
+from functions_logs import get_log_insights_query_results
+from functions_logs import check_log_group_exists
 
 from aws_lambda_powertools import Logger
 from aws_lambda_powertools import Tracer
@@ -70,6 +72,85 @@ def process_eks(metric_name, dimensions, region, account_id, namespace, change_t
         request_kind = dimension_values.get('request_kind')
         resource = dimension_values.get('resource')
 
+        if cluster_name:
+            dashboard_metrics = [
+                {
+                    "title": f"Cluster Nodes - {cluster_name}",
+                    "view": "timeSeries",
+                    "stacked": False,
+                    "stat": "Average",
+                    "period": 60,
+                    "metrics": [                        
+                        [ "ContainerInsights", "node_status_condition_ready", "ClusterName", cluster_name, {"label": "Sum", "color": "#1f77b4", "stat": "Sum", "region": region } ]                       
+                    ]
+                },
+                {
+                    "title": f"Container Restarts - {cluster_name}",
+                    "view": "timeSeries",
+                    "stacked": False,
+                    "stat": "Average",
+                    "period": 60,
+                    "metrics": [                        
+                        [ "ContainerInsights", "pod_number_of_container_restarts", "ClusterName", cluster_name, {"label": "Sum", "color": "#1f77b4", "stat": "Sum", "region": region } ]                       
+                    ]
+                },
+                {
+                    "title": f"Node CPU utilization - {cluster_name}",
+                    "view": "timeSeries",
+                    "stacked": False,
+                    "stat": "Average",
+                    "period": 60,
+                    "metrics": [                        
+                        [ "ContainerInsights", "node_cpu_utilization", "ClusterName", cluster_name, {"label": "Sum", "color": "#1f77b4", "stat": "Sum", "region": region } ]                       
+                    ]
+                },     
+                {
+                    "title": f"Node memory utilization - {cluster_name}",
+                    "view": "timeSeries",
+                    "stacked": False,
+                    "stat": "Average",
+                    "period": 60,
+                    "metrics": [                        
+                        [ "ContainerInsights", "node_memory_utilization", "ClusterName", cluster_name, {"label": "Sum", "color": "#1f77b4", "stat": "Sum", "region": region } ]                       
+                    ]
+                }                       
+            ]  
+            widget_images.extend(build_dashboard(dashboard_metrics, annotation_time, start, end, region))
+            additional_metrics_with_timestamps_removed.extend(get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, region)) 
+
+            # Describe Cluster
+            eks = boto3.client('eks', region_name=region)  
+            try:
+                response = eks.describe_cluster(name=cluster_name)   
+            except botocore.exceptions.ClientError as error:
+                logger.exception("Error describing EKS Cluster")
+                raise RuntimeError("Unable to fullfil request") from error  
+            except botocore.exceptions.ParamValidationError as error:
+                raise ValueError('The parameters you provided are incorrect: {}'.format(error)) 
+            logger.info("Describe Cluster", extra=response)
+
+            resource_information = get_html_table("EKS Cluster" +cluster_name, response['cluster'])       
+            resource_information_object = response['cluster']   
+
+            # Get Tags
+            tags = response['cluster'].get('tags', None)   
+
+            # Get Errors from Logs            
+            log_group = f"/aws/eks/{cluster_name}/cluster"
+            if check_log_group_exists(log_group, region):
+                log_insights_query = """filter @logStream like /^kube-controller-manager-/
+                                        | filter @message like /Error/
+                                        | fields @logStream, @timestamp, @message
+                                        | sort @timestamp desc
+                                        | limit 10
+                                        """
+                log_information, log_events = get_log_insights_query_results(log_group, log_insights_query, region)    
+
+        else:
+            resource_information = None            
+            resource_information_object = None
+            tags = None
+
         # ClusterName, ContainerName, FullPodName, Namespace, PodName
         if cluster_name and container_name and full_pod_name and eks_namespace and pod_name:
             metrics = [
@@ -93,9 +174,8 @@ def process_eks(metric_name, dimensions, region, account_id, namespace, change_t
                             {
                                 "label": "${LABEL}",
                                 "expression": f"""SELECT AVG({metric})
-                                    FROM SCHEMA(ContainerInsights, ClusterName,ContainerName,FullPodName,Namespace,PodName)
+                                    FROM SCHEMA(ContainerInsights, ClusterName, FullPodName, Namespace, PodName)
                                     WHERE ClusterName = '{cluster_name}'
-                                        AND ContainerName = '{container_name}'
                                         AND FullPodName = '{full_pod_name}' 
                                         AND Namespace = '{eks_namespace}'
                                         AND PodName = '{pod_name}'
@@ -108,14 +188,9 @@ def process_eks(metric_name, dimensions, region, account_id, namespace, change_t
             widget_images.extend(build_dashboard(dashboard_metrics, annotation_time, start, end, region))
             additional_metrics_with_timestamps_removed.extend(get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, region))  
                   
-            log_information = None
-            log_events = None           
-            resource_information = None
-            resource_information_object = None 
             trace_summary = None
             trace = None            
             notifications = None
-            tags = None
             
         # ClusterName, ContainerName, Namespace, PodName
         elif cluster_name and container_name and eks_namespace and pod_name:
@@ -153,14 +228,9 @@ def process_eks(metric_name, dimensions, region, account_id, namespace, change_t
             widget_images.extend(build_dashboard(dashboard_metrics, annotation_time, start, end, region))
             additional_metrics_with_timestamps_removed.extend(get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, region))  
                   
-            log_information = None
-            log_events = None           
-            resource_information = None
-            resource_information_object = None 
             trace_summary = None
             trace = None            
             notifications = None
-            tags = None                                                  
 
         # ClusterName, FullPodName, Namespace, PodName
         elif cluster_name and full_pod_name and eks_namespace and pod_name:
@@ -208,14 +278,9 @@ def process_eks(metric_name, dimensions, region, account_id, namespace, change_t
             logger.info(f"dashboard_metrics: {dashboard_metrics}")
             additional_metrics_with_timestamps_removed.extend(get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, region))  
                   
-            log_information = None
-            log_events = None           
-            resource_information = None
-            resource_information_object = None 
             trace_summary = None
             trace = None            
             notifications = None
-            tags = None    
 
         # ClusterName, InstanceId, NodeName
         elif cluster_name and instance_id and node_name:
@@ -254,14 +319,9 @@ def process_eks(metric_name, dimensions, region, account_id, namespace, change_t
             widget_images.extend(build_dashboard(dashboard_metrics, annotation_time, start, end, region))
             additional_metrics_with_timestamps_removed.extend(get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, region))
 
-            log_information = None
-            log_events = None
-            resource_information = None
-            resource_information_object = None
             trace_summary = None
             trace = None
             notifications = None
-            tags = None
         
         # ClusterName, Namespace, PodName
         elif cluster_name and eks_namespace and pod_name:
@@ -306,17 +366,394 @@ def process_eks(metric_name, dimensions, region, account_id, namespace, change_t
             widget_images.extend(build_dashboard(dashboard_metrics, annotation_time, start, end, region))
             additional_metrics_with_timestamps_removed.extend(get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, region))
 
-            log_information = None
-            log_events = None
-            resource_information = None
-            resource_information_object = None
             trace_summary = None
             trace = None
             notifications = None
-            tags = None    
 
         # ClusterName, Namespace, Service
+        elif cluster_name and eks_namespace and service:
+            metrics = [
+                {"name": "pod_cpu_utilization", "title": "Pod CPU Utilization", "stat": "AVG"},
+                {"name": "pod_cpu_utilization_over_pod_limit", "title": "Pod CPU Utilization Over Limit", "stat": "AVG"},
+                {"name": "pod_memory_utilization", "title": "Pod Memory Utilization", "stat": "AVG"},
+                {"name": "pod_memory_utilization_over_pod_limit", "title": "Pod Memory Over Limit", "stat": "AVG"},
+                {"name": "pod_network_rx_bytes", "title": "Network RX", "stat": "AVG"},
+                {"name": "pod_network_tx_bytes", "title": "Network TX", "stat": "AVG"},
+                {"name": "service_number_of_running_pods", "title": "Number of pods", "stat": "AVG"}
+            ]
+
+            dashboard_metrics = []
+            for metric in metrics:
+                dashboard_metrics.append({
+                    "title": metric["title"],
+                    "view": "timeSeries",
+                    "stacked": False,
+                    "period": 300,  
+                    "metrics": [
+                        [
+                            {
+                                "label": service,
+                                "expression": f"""SELECT {metric['stat']}({metric['name']}) 
+                                    FROM ContainerInsights
+                                    WHERE ClusterName = '{cluster_name}'
+                                        AND Namespace = '{eks_namespace}'
+                                        AND Service = '{service}'
+                                """
+                            }
+                        ]
+                    ]
+                })     
+
+            widget_images.extend(build_dashboard(dashboard_metrics, annotation_time, start, end, region))
+            additional_metrics_with_timestamps_removed.extend(get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, region))
+
+            trace_summary = None
+            trace = None
+            notifications = None
+
+        # ClusterName, code, method
+        # Codes: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#http-status-codes
+        elif cluster_name and code and method:
+            status_codes = {
+                "200": "StatusOK",
+                "201": "StatusCreated",
+                "204": "StatusNoContent",
+                "307": "StatusTemporaryRedirect",
+                "400": "StatusBadRequest",
+                "401": "StatusUnauthorized",
+                "403": "StatusForbidden",
+                "404": "StatusNotFound",
+                "405": "StatusMethodNotAllowed",
+                "409": "StatusConflict",
+                "410": "StatusGone",
+                "422": "StatusUnprocessableEntity",
+                "429": "StatusTooManyRequests",
+                "500": "StatusInternalServerError",
+                "503": "StatusServiceUnavailable",
+                "504": "StatusServerTimeout"
+            }
+
+            dashboard_metrics = []
+            for code, title in status_codes.items():
+                expression = f"""SELECT AVG(rest_client_requests_total) 
+                                FROM ContainerInsights
+                                WHERE ClusterName = '{cluster_name}' 
+                                    AND code = '{code}' 
+                                GROUP BY \"method\" """
+                dashboard_metric = {
+                    "title": f"{title} - HTTP {code}",
+                    "view": "timeSeries",
+                    "stacked": False,
+                    "period": 300,
+                    "metrics": [
+                        [
+                            {
+                                "label": code,
+                                "expression": expression
+                            }
+                        ]
+                    ]
+                }
+                dashboard_metrics.append(dashboard_metric)
+
+            widget_images.extend(build_dashboard(dashboard_metrics, annotation_time, start, end, region))
+            additional_metrics_with_timestamps_removed.extend(get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, region))
+
+            trace_summary = None
+            trace = None
+            notifications = None
+
+        # ClusterName, code, verb
+        elif cluster_name and code and verb:
+            status_codes = {
+                "200": "StatusOK",
+                "201": "StatusCreated",
+                "204": "StatusNoContent",
+                "307": "StatusTemporaryRedirect",
+                "400": "StatusBadRequest",
+                "401": "StatusUnauthorized",
+                "403": "StatusForbidden",
+                "404": "StatusNotFound",
+                "405": "StatusMethodNotAllowed",
+                "409": "StatusConflict",
+                "410": "StatusGone",
+                "422": "StatusUnprocessableEntity",
+                "429": "StatusTooManyRequests",
+                "500": "StatusInternalServerError",
+                "503": "StatusServiceUnavailable",
+                "504": "StatusServerTimeout"
+            }
+
+            dashboard_metrics = []
+            for code, title in status_codes.items():
+                expression = f"""SELECT AVG(apiserver_request_total) 
+                                FROM ContainerInsights
+                                WHERE ClusterName = '{cluster_name}' 
+                                    AND code = '{code}' 
+                                GROUP BY \"verb\" """
+                dashboard_metric = {
+                    "title": f"{title} - HTTP {code}",
+                    "view": "timeSeries",
+                    "stacked": False,
+                    "period": 300,
+                    "metrics": [
+                        [
+                            {
+                                "label": code,
+                                "expression": expression
+                            }
+                        ]
+                    ]
+                }
+                dashboard_metrics.append(dashboard_metric)             
+
+            widget_images.extend(build_dashboard(dashboard_metrics, annotation_time, start, end, region))
+            additional_metrics_with_timestamps_removed.extend(get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, region))
+
+            trace_summary = None
+            trace = None
+            notifications = None
+
+        # ClusterName, Namespace
+        elif cluster_name and eks_namespace:
+            metrics = [
+                {"name": "pod_cpu_utilization", "title": "Pod CPU Utilization", "stat": "AVG"},
+                {"name": "pod_cpu_utilization_over_pod_limit", "title": "Pod CPU Utilization Over Limit", "stat": "AVG"},
+                {"name": "pod_memory_utilization", "title": "Pod Memory Utilization", "stat": "AVG"},
+                {"name": "pod_memory_utilization_over_pod_limit", "title": "Pod Memory Over Limit", "stat": "AVG"},
+                {"name": "pod_network_rx_bytes", "title": "Network RX", "stat": "AVG"},
+                {"name": "pod_network_tx_bytes", "title": "Network TX", "stat": "AVG"},
+                {"name": "pod_interface_network_tx_dropped", "title": "Network TX Dropped", "stat": "AVG"},
+                {"name": "namespace_number_of_running_pods", "title": "Number of pods", "stat": "AVG"}
+
+            ]
+
+            dashboard_metrics = []
+            for metric in metrics:
+                dashboard_metrics.append({
+                    "title": metric["title"],
+                    "view": "timeSeries",
+                    "stacked": False,
+                    "period": 300,  
+                    "metrics": [
+                        [
+                            {
+                                "label": namespace,
+                                "expression": f"""SELECT {metric['stat']}({metric['name']}) 
+                                    FROM ContainerInsights
+                                    WHERE ClusterName = '{cluster_name}'
+                                        AND Namespace = '{eks_namespace}'
+                                """
+                            }
+                        ]
+                    ]
+                })     
+
+            widget_images.extend(build_dashboard(dashboard_metrics, annotation_time, start, end, region))
+            additional_metrics_with_timestamps_removed.extend(get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, region))
+
+            trace_summary = None
+            trace = None
+            notifications = None
+
+        # ClusterName, endpoint
+        elif cluster_name and endpoint:
+            # There is only on metric name
+            widget_images = None
+            additional_metrics_with_timestamps_removed = None
+            trace_summary = None
+            trace = None
+            notifications = None
+
+        # ClusterName, operation
+        elif cluster_name and operation:
+            metrics = [
+                {"name": "apiserver_admission_controller_admission_duration_seconds", "title": "apiserver_admission_controller_admission_duration_seconds", "stat": "AVG"},
+                {"name": "apiserver_admission_step_admission_duration_seconds", "title": "apiserver_admission_step_admission_duration_seconds", "stat": "AVG"},
+                {"name": "etcd_request_duration_seconds", "title": "etcd_request_duration_seconds", "stat": "AVG"},
+                {"name": "rest_client_request_duration_seconds", "title": "rest_client_request_duration_seconds", "stat": "AVG"}
+            ]
+
+            dashboard_metrics = []
+            for metric in metrics:
+                dashboard_metrics.append({
+                    "title": metric["title"],
+                    "view": "timeSeries",
+                    "stacked": False,
+                    "period": 300,  
+                    "metrics": [
+                        [
+                            {
+                                "label": operation,
+                                "expression": f"""SELECT {metric['stat']}({metric['name']}) 
+                                    FROM SCHEMA(ContainerInsights, ClusterName,operation) 
+                                    WHERE ClusterName = '{cluster_name}' 
+                                    GROUP BY operation                                
+                                """
+                            }
+                        ]
+                    ]
+                })     
+
+            widget_images.extend(build_dashboard(dashboard_metrics, annotation_time, start, end, region))
+            additional_metrics_with_timestamps_removed.extend(get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, region))
+
+            trace_summary = None
+            trace = None
+            notifications = None
         
+        # ClusterName, priority_level
+        elif cluster_name and priority_level:
+            levels = [
+                "workload-low",
+                "leader-election",
+                "workload-high",
+                "system",
+                "exempt",
+                "global-default",
+                "catch-all",
+                "node-high"          
+            ]
+
+            dashboard_metrics = []
+            for level in levels:
+                dashboard_metric = {
+                    "title": level,
+                    "view": "timeSeries",
+                    "stacked": False,
+                    "stat": "Average",
+                    "period": 300,
+                    "metrics": [
+                        [ 
+                            {
+                                "label": level,
+                                "expression": f"""SELECT AVG(apiserver_flowcontrol_request_concurrency_limit) 
+                                    FROM SCHEMA(ContainerInsights, ClusterName, priority_level) 
+                                    WHERE ClusterName = '{cluster_name}' 
+                                        AND priority_level = '{level}'                                        
+                                """
+                            }
+                        ]
+                    ]
+                }
+                dashboard_metrics.append(dashboard_metric)    
+            
+            widget_images.extend(build_dashboard(dashboard_metrics, annotation_time, start, end, region))
+            additional_metrics_with_timestamps_removed.extend(get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, region))  
+                  
+            trace_summary = None
+            trace = None            
+            notifications = None            
+
+        # ClusterName, request_kind
+        elif cluster_name and request_kind:
+            metrics = [
+                {"name": "apiserver_current_inqueue_requests", "title": "Current inqueue requests", "stat": "AVG"},
+                {"name": "apiserver_current_inflight_requests", "title": "Current inflight requests", "stat": "AVG"}
+            ]
+
+            dashboard_metrics = []
+            for metric in metrics:
+                dashboard_metrics.append({
+                    "title": metric["title"],
+                    "view": "timeSeries",
+                    "stacked": False,
+                    "period": 300,  
+                    "metrics": [
+                        [
+                            {
+                                "label": "${LABEL}",
+                                "expression": f"""SELECT {metric['stat']}({metric['name']}) 
+                                    FROM SCHEMA(ContainerInsights, ClusterName, request_kind) 
+                                    WHERE ClusterName = '{cluster_name}' 
+                                    GROUP BY request_kind                                
+                                """
+                            }
+                        ]
+                    ]
+                })     
+
+            widget_images.extend(build_dashboard(dashboard_metrics, annotation_time, start, end, region))
+            additional_metrics_with_timestamps_removed.extend(get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, region))
+
+            trace_summary = None
+            trace = None
+            notifications = None
+
+        #ClusterName, resource
+        elif cluster_name and resource:
+            metrics = [
+                {"name": "apiserver_storage_objects", "title": "Storage objects", "stat": "AVG"},
+                {"name": "apiserver_storage_list_duration_seconds", "title": "Storage list duration", "stat": "AVG"},
+                {"name": "apiserver_longrunning_requests", "title": "Long running requests", "stat": "AVG"}
+            ]
+
+            dashboard_metrics = []
+            for metric in metrics:
+                dashboard_metrics.append({
+                    "title": metric["title"],
+                    "view": "timeSeries",
+                    "stacked": False,
+                    "period": 300,  
+                    "metrics": [
+                        [
+                            {
+                                "label": metric["name"],
+                                "expression": f"""SELECT {metric['stat']}({metric['name']}) 
+                                    FROM SCHEMA(ContainerInsights, ClusterName, resource) 
+                                    WHERE ClusterName = '{cluster_name}'
+                                        AND resource = '{resource}'                                                 
+                                """
+                            }
+                        ]
+                    ]
+                })     
+
+            widget_images.extend(build_dashboard(dashboard_metrics, annotation_time, start, end, region))
+            additional_metrics_with_timestamps_removed.extend(get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, region))
+
+            trace_summary = None
+            trace = None
+            notifications = None
+
+        # ClusterName, verb
+        elif cluster_name and verb:
+            metrics = [
+                {"name": "apiserver_request_duration_seconds", "title": "API server request duration", "stat": "AVG"},
+                {"name": "rest_client_request_duration_seconds", "title": "Rest client reequest duration", "stat": "AVG"}
+            ]
+
+            dashboard_metrics = []
+            for metric in metrics:
+                dashboard_metrics.append({
+                    "title": metric["title"],
+                    "view": "timeSeries",
+                    "stacked": False,
+                    "period": 300,  
+                    "metrics": [
+                        [
+                            {
+                                "label": metric["name"],
+                                "expression": f"""SELECT {metric['stat']}({metric['name']}) 
+                                    FROM SCHEMA(ContainerInsights, ClusterName, resource) 
+                                    WHERE ClusterName = '{cluster_name}'
+                                    GROUP BY verb                                                
+                                """
+                            }
+                        ]
+                    ]
+                })  
+
+            widget_images.extend(build_dashboard(dashboard_metrics, annotation_time, start, end, region))
+            additional_metrics_with_timestamps_removed.extend(get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, region))
+
+            trace_summary = None
+            trace = None
+            notifications = None
+
+        # ClusterName
+        elif cluster_name:
+            pass
 
         else:
             # Should not get here
@@ -333,7 +770,7 @@ def process_eks(metric_name, dimensions, region, account_id, namespace, change_t
         trace_summary = None
         trace = None
         notifications = None
-        tags = None          
+        tags = None
     else:
         contextual_links = None
         log_information = None
