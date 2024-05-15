@@ -24,6 +24,7 @@ def process_api_gateway(dimensions, region, account_id, namespace, change_time, 
         api_name = dimension_values.get('ApiName')
         api_stage = dimension_values.get('Stage')
         resource = dimension_values.get('Resource')
+        method = dimension_values.get('Method')
 
         link = f'https://{region}.console.aws.amazon.com/apigateway/home?region={region}#/apis/{api_name}/stages/{api_stage}'
         contextual_links = get_dashboard_button(f"{api_name} stage: {api_stage} details", link)
@@ -81,6 +82,7 @@ def process_api_gateway(dimensions, region, account_id, namespace, change_time, 
                     ]
                 }
             ]
+
         elif api_name:
             dashboard_metrics = [
                 {
@@ -134,6 +136,61 @@ def process_api_gateway(dimensions, region, account_id, namespace, change_time, 
                     ]
                 }
             ]
+
+        elif resource and method:
+            dashboard_metrics = [
+                { 
+                    "title": "Integration Latency",
+                    "view": "timeSeries",
+                    "stacked": False,
+                    "stat": "Average",
+                    "period": 60,
+                    "metrics": [
+                        [namespace, "IntegrationLatency", "ApiName", api_name, "Resource", resource, "Stage", api_stage, "Method", method]
+                    ]
+                },
+                {
+                    "title": "Latency",
+                    "view": "timeSeries",
+                    "stacked": False,
+                    "stat": "Average",
+                    "period": 60,
+                    "metrics": [
+                        [namespace, "Latency", "ApiName", api_name, "Resource", resource, "Stage", api_stage, "Method", method]
+                    ]
+                },
+                {
+                    "title": "5xx Errors",
+                    "view": "timeSeries",
+                    "stacked": False,
+                    "stat": "Sum",
+                    "period": 60,
+                    "metrics": [
+                        [namespace, "5XXError", "ApiName", api_name, "Resource", resource, "Stage", api_stage, "Method", method]
+                    ]
+                },
+                {
+                    "title": "Request Count",
+                    "view": "timeSeries",
+                    "stacked": False,
+                    "stat": "SampleCount",
+                    "period": 60,
+                    "metrics": [
+                        [namespace, "Count", "ApiName", api_name, "Resource", resource, "Stage", api_stage, "Method", method]
+                    ]
+                },
+                {
+                    "title": "4xx Errors",
+                    "view": "timeSeries",
+                    "stacked": False,
+                    "stat": "Sum",
+                    "period": 60,
+                    "metrics": [
+                        [namespace, "4XXError", "ApiName", api_name, "Resource", resource, "Stage", api_stage, "Method", method]
+                    ]
+                }
+            ]
+
         widget_images = build_dashboard(dashboard_metrics, annotation_time, start, end, region) 
         additional_metrics_with_timestamps_removed = get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, region)
 
@@ -162,7 +219,6 @@ def process_api_gateway(dimensions, region, account_id, namespace, change_time, 
                 raise RuntimeError("Unable to fullfil request") from error  
             except botocore.exceptions.ParamValidationError as error:
                 raise ValueError('The parameters you provided are incorrect: {}'.format(error))
-            logger.info("Rest API", extra={"api_response": response})
             tags = response.get('tags', {})
             resource_information = get_html_table("API Gateway: " + api_name, response) 
             resource_information_object = response  
@@ -176,7 +232,6 @@ def process_api_gateway(dimensions, region, account_id, namespace, change_time, 
                 except botocore.exceptions.ParamValidationError as error:
                     raise ValueError('The parameters you provided are incorrect: {}'.format(error))
                 tags = response.get('tags', {})
-                logger.info("Tags", extra=tags)
                 resource_information = get_html_table("API Gateway: " + api_name, response)
                 resource_information_object = response  
 
