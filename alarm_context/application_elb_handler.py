@@ -25,6 +25,14 @@ def process_application_elb(dimensions, region, account_id, namespace, change_ti
     if dimensions:
         dimension_values = {element['name']: element['value'] for element in dimensions}
 
+        # Per AppELB, per AZ, per TG Metrics
+        # Per AppELB, per AZ Metrics
+        # AvailabilityZone, TargetGroup
+        # Per AppELB, per TG Metrics
+        # Per AppELB Metrics
+        # TargetGroup
+
+
         # Possible Dimensions
         target_group = dimension_values.get('TargetGroup')
         load_balancer = dimension_values.get('LoadBalancer')
@@ -44,219 +52,298 @@ def process_application_elb(dimensions, region, account_id, namespace, change_ti
             contextual_links += get_dashboard_button(f'{target_group_name} TG details', link) 
 
         link = f'https://{region}.console.aws.amazon.com/cloudwatch/home?region={region}#home:dashboards/ApplicationELB?~(alarmStateFilter~(~\'ALARM))'
-        contextual_links += get_dashboard_button("Application ELB in ALARM dashboard", link)            
+        contextual_links += get_dashboard_button("Application ELB in ALARM dashboard", link)     
 
-        if load_balancer and target_group:
-            dashboard_metrics = [
-                {
-                    "title": "RequestCount: Sum",
+         # Per AppELB, per AZ, per TG Metrics
+        if load_balancer and availability_zone and target_group:
+            metrics = [
+                ("RequestCount", "SUM"),
+                ("HealthyHostCount", "AVG"),
+                ("UnHealthyHostCount", "AVG"),
+                ("HTTPCode_Target_2XX_Count", "SUM"),
+                ("HTTPCode_Target_3XX_Count", "SUM"),
+                ("HTTPCode_Target_4XX_Count", "SUM"),
+                ("TargetResponseTime", "AVG")
+            ]
+
+            dashboard_metrics = []
+            for metric_info in metrics:
+                metric, agg_function = metric_info
+                dashboard_metric = {
+                    "title": metric,
                     "view": "timeSeries",
                     "stacked": False,
                     "stat": "Sum",
-                    "period": 60,
+                    "period": 300,
                     "metrics": [
-                        ["AWS/ApplicationELB", "RequestCount", "LoadBalancer", load_balancer, "TargetGroup", target_group]
+                        [ 
+                            {
+                                "expression": f"""SELECT {agg_function}({metric}) 
+                                    FROM SCHEMA("AWS/ApplicationELB", AvailabilityZone, LoadBalancer, TargetGroup)
+                                    WHERE LoadBalancer = '{load_balancer}'
+                                    AND TargetGroup = '{target_group}'
+                                    GROUP BY AvailabilityZone
+                                """
+                            }
+                        ]
                     ]
                 }
-            ]
+                dashboard_metrics.append(dashboard_metric)    
             widget_images.extend(build_dashboard(dashboard_metrics, annotation_time, start, end, region))
-            additional_metrics_with_timestamps_removed.extend(get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, region))
+            logger.info(f"dashboard_metrics: {dashboard_metrics}")
+            additional_metrics_with_timestamps_removed.extend(get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, region))                     
 
-        if load_balancer:
-            dashboard_metrics = [
-                {
-                    "title": "HTTPCode_ELB_5XX_Count: Sum",
+        # Per AppELB, per AZ Metrics
+        elif load_balancer and availability_zone:
+            metrics = [
+                ("RequestCount", "SUM"),
+                ("UnhealthyRoutingRequestCount", "SUM"),
+                ("HTTPCode_ELB_5XX_Count", "SUM"),
+                ("HTTPCode_Target_2XX_Count", "SUM"),
+                ("HTTPCode_Target_3XX_Count", "SUM"),
+                ("HTTPCode_Target_4XX_Count", "SUM"),
+                ("ProcessedBytes", "SUM"),                
+                ("TargetResponseTime", "AVG")
+            ]
+
+            dashboard_metrics = []
+            for metric_info in metrics:
+                metric, agg_function = metric_info
+                dashboard_metric = {
+                    "title": metric,
                     "view": "timeSeries",
                     "stacked": False,
                     "stat": "Sum",
-                    "period": 60,
+                    "period": 300,
                     "metrics": [
-                        ["AWS/ApplicationELB", "HTTPCode_ELB_5XX_Count", "LoadBalancer", load_balancer]
-                    ]
-                },
-                {
-                    "title": "ActiveConnectionCount: Sum",
-                    "view": "timeSeries",
-                    "stacked": False,
-                    "stat": "Sum",
-                    "period": 60,
-                    "metrics": [
-                        ["AWS/ApplicationELB", "ActiveConnectionCount", "LoadBalancer", load_balancer]
-                    ]
-                },
-                {
-                    "title": "ClientTLSNegotiationErrorCount: Sum",
-                    "view": "timeSeries",
-                    "stacked": False,
-                    "stat": "Sum",
-                    "period": 60,
-                    "metrics": [
-                        ["AWS/ApplicationELB", "ClientTLSNegotiationErrorCount", "LoadBalancer", load_balancer]
-                    ]
-                },
-                {
-                    "title": "ConsumedLCUs: Average",
-                    "view": "timeSeries",
-                    "stacked": False,
-                    "stat": "Average",
-                    "period": 60,
-                    "metrics": [
-                        ["AWS/ApplicationELB", "ConsumedLCUs", "LoadBalancer", load_balancer]
-                    ]
-                },
-                {
-                    "title": "HTTP_Fixed_Response_Count: Sum",
-                    "view": "timeSeries",
-                    "stacked": False,
-                    "stat": "Sum",
-                    "period": 60,
-                    "metrics": [
-                        ["AWS/ApplicationELB", "HTTP_Fixed_Response_Count", "LoadBalancer", load_balancer]
-                    ]
-                },
-                {
-                    "title": "HTTP_Redirect_Count: Sum",
-                    "view": "timeSeries",
-                    "stacked": False,
-                    "stat": "Sum",
-                    "period": 60,
-                    "metrics": [
-                        ["AWS/ApplicationELB", "HTTP_Redirect_Count", "LoadBalancer", load_balancer]
-                    ]
-                },
-                {
-                    "title": "HTTP_Redirect_Url_Limit_Exceeded_Count: Sum",
-                    "view": "timeSeries",
-                    "stacked": False,
-                    "stat": "Sum",
-                    "period": 60,
-                    "metrics": [
-                        ["AWS/ApplicationELB", "HTTP_Redirect_Url_Limit_Exceeded_Count", "LoadBalancer", load_balancer]
-                    ]
-                },
-                {
-                    "title": "HTTPCode_ELB_3XX_Count: Sum",
-                    "view": "timeSeries",
-                    "stacked": False,
-                    "stat": "Sum",
-                    "period": 60,
-                    "metrics": [
-                        ["AWS/ApplicationELB", "HTTPCode_ELB_3XX_Count", "LoadBalancer", load_balancer]
-                    ]
-                },
-                {
-                    "title": "HTTPCode_ELB_4XX_Count: Sum",
-                    "view": "timeSeries",
-                    "stacked": False,
-                    "stat": "Sum",
-                    "period": 60,
-                    "metrics": [
-                        ["AWS/ApplicationELB", "HTTPCode_ELB_4XX_Count", "LoadBalancer", load_balancer]
-                    ]
-                },
-                {
-                    "title": "HTTPCode_ELB_5XX_Count: Sum",
-                    "view": "timeSeries",
-                    "stacked": False,
-                    "stat": "Sum",
-                    "period": 60,
-                    "metrics": [
-                        ["AWS/ApplicationELB", "HTTPCode_ELB_5XX_Count", "LoadBalancer", load_balancer]
-                    ]
-                },
-                {
-                    "title": "HTTP_Fixed_Response_Count: Sum",
-                    "view": "timeSeries",
-                    "stacked": False,
-                    "stat": "Sum",
-                    "period": 60,
-                    "metrics": [
-                        ["AWS/ApplicationELB", "HTTP_Fixed_Response_Count", "LoadBalancer", load_balancer]
-                    ]
-                },
-                {
-                    "title": "HTTP_Redirect_Count: Sum",
-                    "view": "timeSeries",
-                    "stacked": False,
-                    "stat": "Sum",
-                    "period": 60,
-                    "metrics": [
-                        ["AWS/ApplicationELB", "HTTP_Redirect_Count", "LoadBalancer", load_balancer]
-                    ]
-                },
-                {
-                    "title": "HTTP_Redirect_Url_Limit_Exceeded_Count: Sum",
-                    "view": "timeSeries",
-                    "stacked": False,
-                    "stat": "Sum",
-                    "period": 60,
-                    "metrics": [
-                        ["AWS/ApplicationELB", "HTTP_Redirect_Url_Limit_Exceeded_Count", "LoadBalancer", load_balancer]
-                    ]
-                },
-                {
-                    "title": "IPv6ProcessedBytes: Sum",
-                    "view": "timeSeries",
-                    "stacked": False,
-                    "stat": "Sum",
-                    "period": 60,
-                    "metrics": [
-                        ["AWS/ApplicationELB", "IPv6ProcessedBytes", "LoadBalancer", load_balancer]
-                    ]
-                },
-                {
-                    "title": "IPv6RequestCount: Sum",
-                    "view": "timeSeries",
-                    "stacked": False,
-                    "stat": "Sum",
-                    "period": 60,
-                    "metrics": [
-                        ["AWS/ApplicationELB", "IPv6RequestCount", "LoadBalancer", load_balancer]
-                    ]
-                },
-                {
-                    "title": "NewConnectionCount: Sum",
-                    "view": "timeSeries",
-                    "stacked": False,
-                    "stat": "Sum",
-                    "period": 60,
-                    "metrics": [
-                        ["AWS/ApplicationELB", "NewConnectionCount", "LoadBalancer", load_balancer]
-                    ]
-                },
-                {
-                    "title": "ProcessedBytes: Sum",
-                    "view": "timeSeries",
-                    "stacked": False,
-                    "stat": "Sum",
-                    "period": 60,
-                    "metrics": [
-                        ["AWS/ApplicationELB", "ProcessedBytes", "LoadBalancer", load_balancer]
-                    ]
-                },
-                {
-                    "title": "RejectedConnectionCount: Sum",
-                    "view": "timeSeries",
-                    "stacked": False,
-                    "stat": "Sum",
-                    "period": 60,
-                    "metrics": [
-                        ["AWS/ApplicationELB", "RejectedConnectionCount", "LoadBalancer", load_balancer]
-                    ],
-                },
-                {
-                    "title": "RuleEvaluations: Sum",
-                    "view": "timeSeries",
-                    "stacked": False,
-                    "stat": "Sum",
-                    "period": 60,
-                    "metrics": [
-                        ["AWS/ApplicationELB", "RuleEvaluations", "LoadBalancer", load_balancer]
+                        [ 
+                            {
+                                "expression": f"""SELECT {agg_function}({metric}) 
+                                    FROM SCHEMA("AWS/ApplicationELB", AvailabilityZone, LoadBalancer)                                    
+                                    WHERE LoadBalancer = '{load_balancer}'
+                                    GROUP BY AvailabilityZone
+                                """
+                            }
+                        ]
                     ]
                 }
-            ]
+                dashboard_metrics.append(dashboard_metric)    
             widget_images.extend(build_dashboard(dashboard_metrics, annotation_time, start, end, region))
-            additional_metrics_with_timestamps_removed.extend(get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, region))
+            logger.info(f"dashboard_metrics: {dashboard_metrics}")
+            additional_metrics_with_timestamps_removed.extend(get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, region))    
+
+        else:
+            if load_balancer and target_group:
+                dashboard_metrics = [
+                    {
+                        "title": "RequestCount: Sum",
+                        "view": "timeSeries",
+                        "stacked": False,
+                        "stat": "Sum",
+                        "period": 60,
+                        "metrics": [
+                            ["AWS/ApplicationELB", "RequestCount", "LoadBalancer", load_balancer, "TargetGroup", target_group]
+                        ]
+                    }
+                ]
+                widget_images.extend(build_dashboard(dashboard_metrics, annotation_time, start, end, region))
+                additional_metrics_with_timestamps_removed.extend(get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, region))
+
+            if load_balancer:
+                dashboard_metrics = [
+                    {
+                        "title": "HTTPCode_ELB_5XX_Count: Sum",
+                        "view": "timeSeries",
+                        "stacked": False,
+                        "stat": "Sum",
+                        "period": 60,
+                        "metrics": [
+                            ["AWS/ApplicationELB", "HTTPCode_ELB_5XX_Count", "LoadBalancer", load_balancer]
+                        ]
+                    },
+                    {
+                        "title": "ActiveConnectionCount: Sum",
+                        "view": "timeSeries",
+                        "stacked": False,
+                        "stat": "Sum",
+                        "period": 60,
+                        "metrics": [
+                            ["AWS/ApplicationELB", "ActiveConnectionCount", "LoadBalancer", load_balancer]
+                        ]
+                    },
+                    {
+                        "title": "ClientTLSNegotiationErrorCount: Sum",
+                        "view": "timeSeries",
+                        "stacked": False,
+                        "stat": "Sum",
+                        "period": 60,
+                        "metrics": [
+                            ["AWS/ApplicationELB", "ClientTLSNegotiationErrorCount", "LoadBalancer", load_balancer]
+                        ]
+                    },
+                    {
+                        "title": "ConsumedLCUs: Average",
+                        "view": "timeSeries",
+                        "stacked": False,
+                        "stat": "Average",
+                        "period": 60,
+                        "metrics": [
+                            ["AWS/ApplicationELB", "ConsumedLCUs", "LoadBalancer", load_balancer]
+                        ]
+                    },
+                    {
+                        "title": "HTTP_Fixed_Response_Count: Sum",
+                        "view": "timeSeries",
+                        "stacked": False,
+                        "stat": "Sum",
+                        "period": 60,
+                        "metrics": [
+                            ["AWS/ApplicationELB", "HTTP_Fixed_Response_Count", "LoadBalancer", load_balancer]
+                        ]
+                    },
+                    {
+                        "title": "HTTP_Redirect_Count: Sum",
+                        "view": "timeSeries",
+                        "stacked": False,
+                        "stat": "Sum",
+                        "period": 60,
+                        "metrics": [
+                            ["AWS/ApplicationELB", "HTTP_Redirect_Count", "LoadBalancer", load_balancer]
+                        ]
+                    },
+                    {
+                        "title": "HTTP_Redirect_Url_Limit_Exceeded_Count: Sum",
+                        "view": "timeSeries",
+                        "stacked": False,
+                        "stat": "Sum",
+                        "period": 60,
+                        "metrics": [
+                            ["AWS/ApplicationELB", "HTTP_Redirect_Url_Limit_Exceeded_Count", "LoadBalancer", load_balancer]
+                        ]
+                    },
+                    {
+                        "title": "HTTPCode_ELB_3XX_Count: Sum",
+                        "view": "timeSeries",
+                        "stacked": False,
+                        "stat": "Sum",
+                        "period": 60,
+                        "metrics": [
+                            ["AWS/ApplicationELB", "HTTPCode_ELB_3XX_Count", "LoadBalancer", load_balancer]
+                        ]
+                    },
+                    {
+                        "title": "HTTPCode_ELB_4XX_Count: Sum",
+                        "view": "timeSeries",
+                        "stacked": False,
+                        "stat": "Sum",
+                        "period": 60,
+                        "metrics": [
+                            ["AWS/ApplicationELB", "HTTPCode_ELB_4XX_Count", "LoadBalancer", load_balancer]
+                        ]
+                    },
+                    {
+                        "title": "HTTPCode_ELB_5XX_Count: Sum",
+                        "view": "timeSeries",
+                        "stacked": False,
+                        "stat": "Sum",
+                        "period": 60,
+                        "metrics": [
+                            ["AWS/ApplicationELB", "HTTPCode_ELB_5XX_Count", "LoadBalancer", load_balancer]
+                        ]
+                    },
+                    {
+                        "title": "HTTP_Fixed_Response_Count: Sum",
+                        "view": "timeSeries",
+                        "stacked": False,
+                        "stat": "Sum",
+                        "period": 60,
+                        "metrics": [
+                            ["AWS/ApplicationELB", "HTTP_Fixed_Response_Count", "LoadBalancer", load_balancer]
+                        ]
+                    },
+                    {
+                        "title": "HTTP_Redirect_Count: Sum",
+                        "view": "timeSeries",
+                        "stacked": False,
+                        "stat": "Sum",
+                        "period": 60,
+                        "metrics": [
+                            ["AWS/ApplicationELB", "HTTP_Redirect_Count", "LoadBalancer", load_balancer]
+                        ]
+                    },
+                    {
+                        "title": "HTTP_Redirect_Url_Limit_Exceeded_Count: Sum",
+                        "view": "timeSeries",
+                        "stacked": False,
+                        "stat": "Sum",
+                        "period": 60,
+                        "metrics": [
+                            ["AWS/ApplicationELB", "HTTP_Redirect_Url_Limit_Exceeded_Count", "LoadBalancer", load_balancer]
+                        ]
+                    },
+                    {
+                        "title": "IPv6ProcessedBytes: Sum",
+                        "view": "timeSeries",
+                        "stacked": False,
+                        "stat": "Sum",
+                        "period": 60,
+                        "metrics": [
+                            ["AWS/ApplicationELB", "IPv6ProcessedBytes", "LoadBalancer", load_balancer]
+                        ]
+                    },
+                    {
+                        "title": "IPv6RequestCount: Sum",
+                        "view": "timeSeries",
+                        "stacked": False,
+                        "stat": "Sum",
+                        "period": 60,
+                        "metrics": [
+                            ["AWS/ApplicationELB", "IPv6RequestCount", "LoadBalancer", load_balancer]
+                        ]
+                    },
+                    {
+                        "title": "NewConnectionCount: Sum",
+                        "view": "timeSeries",
+                        "stacked": False,
+                        "stat": "Sum",
+                        "period": 60,
+                        "metrics": [
+                            ["AWS/ApplicationELB", "NewConnectionCount", "LoadBalancer", load_balancer]
+                        ]
+                    },
+                    {
+                        "title": "ProcessedBytes: Sum",
+                        "view": "timeSeries",
+                        "stacked": False,
+                        "stat": "Sum",
+                        "period": 60,
+                        "metrics": [
+                            ["AWS/ApplicationELB", "ProcessedBytes", "LoadBalancer", load_balancer]
+                        ]
+                    },
+                    {
+                        "title": "RejectedConnectionCount: Sum",
+                        "view": "timeSeries",
+                        "stacked": False,
+                        "stat": "Sum",
+                        "period": 60,
+                        "metrics": [
+                            ["AWS/ApplicationELB", "RejectedConnectionCount", "LoadBalancer", load_balancer]
+                        ],
+                    },
+                    {
+                        "title": "RuleEvaluations: Sum",
+                        "view": "timeSeries",
+                        "stacked": False,
+                        "stat": "Sum",
+                        "period": 60,
+                        "metrics": [
+                            ["AWS/ApplicationELB", "RuleEvaluations", "LoadBalancer", load_balancer]
+                        ]
+                    }
+                ]
+                widget_images.extend(build_dashboard(dashboard_metrics, annotation_time, start, end, region))
+                additional_metrics_with_timestamps_removed.extend(get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, region))
             
         elbv2 = boto3.client('elbv2', region_name=region)
         resource_arns = []
