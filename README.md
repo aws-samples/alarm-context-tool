@@ -1,4 +1,4 @@
-# Alarm Context Enhancer
+# Alarm Context Tool
 
 This project enhances AWS CloudWatch Alarms by providing additional context to aid in troubleshooting. It leverages AWS Lambda, CloudWatch, X-Ray, and other AWS services to gather and present relevant information.
 
@@ -18,8 +18,8 @@ This project enhances AWS CloudWatch Alarms by providing additional context to a
 ## Setup
 1. Clone the repository:
     ```sh
-    git clone https://github.com/your-repo/alarm-context.git
-    cd alarm-context
+    git clone https://github.com/your-repo/alarm-context.git    
+    cd alarm-context  
     ```
 
 2. Install dependencies:
