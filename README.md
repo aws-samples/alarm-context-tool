@@ -1,130 +1,140 @@
-# sam-alarm-context
+# Alarm Context Enhancer
 
-This project contains source code and supporting files for a serverless application that you can deploy with the SAM CLI. It includes the following files and folders.
+This project enhances AWS CloudWatch Alarms by providing additional context to aid in troubleshooting. It leverages AWS Lambda, CloudWatch, X-Ray, and other AWS services to gather and present relevant information.
 
-- hello_world - Code for the application's Lambda function.
-- events - Invocation events that you can use to invoke the function.
-- tests - Unit tests for the application code. 
-- template.yaml - A template that defines the application's AWS resources.
+## Table of Contents
+- [Prerequisites](#prerequisites)
+- [Setup](#setup)
+- [Deployment](#deployment)
+- [Usage](#usage)
+- [Creating a New Handler](#creating-a-new-handler)
+- [Available Functions](#available-functions)
 
-The application uses several AWS resources, including Lambda functions and an API Gateway API. These resources are defined in the `template.yaml` file in this project. You can update the template to add AWS resources through the same deployment process that updates your application code.
+## Prerequisites
+1. AWS CLI configured with appropriate permissions.
+2. Python 3.8 or later.
+3. AWS SAM CLI for deployment.
 
-If you prefer to use an integrated development environment (IDE) to build and test your application, you can use the AWS Toolkit.  
-The AWS Toolkit is an open source plug-in for popular IDEs that uses the SAM CLI to build and deploy serverless applications on AWS. The AWS Toolkit also adds a simplified step-through debugging experience for Lambda function code. See the following links to get started.
+## Setup
+1. Clone the repository:
+    ```sh
+    git clone https://github.com/your-repo/alarm-context.git
+    cd alarm-context
+    ```
 
-* [CLion](https://docs.aws.amazon.com/toolkit-for-jetbrains/latest/userguide/welcome.html)
-* [GoLand](https://docs.aws.amazon.com/toolkit-for-jetbrains/latest/userguide/welcome.html)
-* [IntelliJ](https://docs.aws.amazon.com/toolkit-for-jetbrains/latest/userguide/welcome.html)
-* [WebStorm](https://docs.aws.amazon.com/toolkit-for-jetbrains/latest/userguide/welcome.html)
-* [Rider](https://docs.aws.amazon.com/toolkit-for-jetbrains/latest/userguide/welcome.html)
-* [PhpStorm](https://docs.aws.amazon.com/toolkit-for-jetbrains/latest/userguide/welcome.html)
-* [PyCharm](https://docs.aws.amazon.com/toolkit-for-jetbrains/latest/userguide/welcome.html)
-* [RubyMine](https://docs.aws.amazon.com/toolkit-for-jetbrains/latest/userguide/welcome.html)
-* [DataGrip](https://docs.aws.amazon.com/toolkit-for-jetbrains/latest/userguide/welcome.html)
-* [VS Code](https://docs.aws.amazon.com/toolkit-for-vscode/latest/userguide/welcome.html)
-* [Visual Studio](https://docs.aws.amazon.com/toolkit-for-visual-studio/latest/user-guide/welcome.html)
+2. Install dependencies:
+    ```sh
+    pip install -r requirements.txt
+    ```
 
-## Deploy the sample application
+## Deployment
+1. Package the SAM application:
+    ```sh
+    sam package --output-template-file packaged.yaml --s3-bucket YOUR_S3_BUCKET_NAME
+    ```
 
-The Serverless Application Model Command Line Interface (SAM CLI) is an extension of the AWS CLI that adds functionality for building and testing Lambda applications. It uses Docker to run your functions in an Amazon Linux environment that matches Lambda. It can also emulate your application's build environment and API.
+2. Deploy the packaged application:
+    ```sh
+    sam deploy --template-file packaged.yaml --stack-name alarm-context --capabilities CAPABILITY_IAM
+    ```
 
-To use the SAM CLI, you need the following tools.
+## Usage
+Once deployed, the Lambda function will be triggered by CloudWatch Alarms. The function will enhance the alarm message with additional context such as related metrics, logs, and traces.
 
-* SAM CLI - [Install the SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-install.html)
-* [Python 3 installed](https://www.python.org/downloads/)
-* Docker - [Install Docker community edition](https://hub.docker.com/search/?type=edition&offering=community)
+## Creating a New Handler
+To create a new handler for a different AWS service, follow these steps:
 
-To build and deploy your application for the first time, run the following in your shell:
+1. **Create a new handler file**:
+    Create a new Python file in the `handlers` directory. For example, `new_service_handler.py`.
 
-```bash
-sam build --use-container
-sam deploy --guided
-```
+2. **Define the handler function**:
+    Implement the handler function similar to existing handlers. Here's a template:
 
-The first command will build the source of your application. The second command will package and deploy your application to AWS, with a series of prompts:
+    ```python
+    import boto3
+    import botocore
+    from aws_lambda_powertools import Logger, Tracer
 
-* **Stack Name**: The name of the stack to deploy to CloudFormation. This should be unique to your account and region, and a good starting point would be something matching your project name.
-* **AWS Region**: The AWS region you want to deploy your app to.
-* **Confirm changes before deploy**: If set to yes, any change sets will be shown to you before execution for manual review. If set to no, the AWS SAM CLI will automatically deploy application changes.
-* **Allow SAM CLI IAM role creation**: Many AWS SAM templates, including this example, create AWS IAM roles required for the AWS Lambda function(s) included to access AWS services. By default, these are scoped down to minimum required permissions. To deploy an AWS CloudFormation stack which creates or modifies IAM roles, the `CAPABILITY_IAM` value for `capabilities` must be provided. If permission isn't provided through this prompt, to deploy this example you must explicitly pass `--capabilities CAPABILITY_IAM` to the `sam deploy` command.
-* **Save arguments to samconfig.toml**: If set to yes, your choices will be saved to a configuration file inside the project, so that in the future you can just re-run `sam deploy` without parameters to deploy changes to your application.
+    logger = Logger()
+    tracer = Tracer()
 
-You can find your API Gateway Endpoint URL in the output values displayed after deployment.
+    @tracer.capture_method
+    def process_new_service(dimensions, region, account_id, namespace, change_time, annotation_time, start_time, end_time, start, end):
+        # Your implementation here
+        pass
+    ```
 
-## Use the SAM CLI to build and test locally
+3. **Add the handler to the Lambda function**:
+    Update `lambda_function.py` to import and call your new handler based on the trigger.
 
-Build your application with the `sam build --use-container` command.
+4. **Update the template**:
+    Modify `template.yaml` to include your new handler if necessary.
 
-```bash
-sam-alarm-context$ sam build --use-container
-```
+## Available Functions
+The following functions are available to use within handlers:
 
-The SAM CLI installs dependencies defined in `hello_world/requirements.txt`, creates a deployment package, and saves it in the `.aws-sam/build` folder.
+- **build_dashboard**: Generates CloudWatch dashboard widgets based on provided metrics.
+    ```python
+    from functions_metrics import build_dashboard
+    ```
 
-Test a single function by invoking it directly with a test event. An event is a JSON document that represents the input that the function receives from the event source. Test events are included in the `events` folder in this project.
+- **get_metrics_from_dashboard_metrics**: Extracts metrics data from dashboard metrics.
+    ```python
+    from functions_metrics import get_metrics_from_dashboard_metrics
+    ```
 
-Run functions locally and invoke them with the `sam local invoke` command.
+- **get_last_10_events**: Retrieves the last 10 log events from a specified log group.
+    ```python
+    from functions_logs import get_last_10_events
+    ```
 
-```bash
-sam-alarm-context$ sam local invoke HelloWorldFunction --event events/event.json
-```
+- **get_log_insights_link**: Generates a CloudWatch Log Insights link for querying logs.
+    ```python
+    from functions_logs import get_log_insights_link
+    ```
 
-The SAM CLI can also emulate your application's API. Use the `sam local start-api` to run the API locally on port 3000.
+- **process_traces**: Processes X-Ray traces based on a filter expression.
+    ```python
+    from functions_xray import process_traces
+    ```
 
-```bash
-sam-alarm-context$ sam local start-api
-sam-alarm-context$ curl http://localhost:3000/
-```
+- **get_dashboard_button**: Creates a button link for the CloudWatch dashboard.
+    ```python
+    from functions import get_dashboard_button
+    ```
 
-The SAM CLI reads the application template to determine the API's routes and the functions that they invoke. The `Events` property on each function's definition includes the route and method for each path.
+- **get_html_table**: Converts data into an HTML table format.
+    ```python
+    from functions import get_html_table
+    ```
 
-```yaml
-      Events:
-        HelloWorld:
-          Type: Api
-          Properties:
-            Path: /hello
-            Method: get
-```
+### Example Handler
+Here is an example of a simple handler for EC2:
 
-## Add a resource to your application
-The application template uses AWS Serverless Application Model (AWS SAM) to define application resources. AWS SAM is an extension of AWS CloudFormation with a simpler syntax for configuring common serverless application resources such as functions, triggers, and APIs. For resources not included in [the SAM specification](https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md), you can use standard [AWS CloudFormation](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-template-resource-type-ref.html) resource types.
+```python
+import boto3
+import botocore
+from aws_lambda_powertools import Logger, Tracer
+from functions import get_html_table
+from functions_metrics import build_dashboard
 
-## Fetch, tail, and filter Lambda function logs
+logger = Logger()
+tracer = Tracer()
 
-To simplify troubleshooting, SAM CLI has a command called `sam logs`. `sam logs` lets you fetch logs generated by your deployed Lambda function from the command line. In addition to printing the logs on the terminal, this command has several nifty features to help you quickly find the bug.
+@tracer.capture_method
+def process_ec2(dimensions, region, account_id, namespace, change_time, annotation_time, start_time, end_time, start, end):
+    if dimensions:
+        dimension_values = {element['name']: element['value'] for element in dimensions}
+        instance_id = dimension_values.get('InstanceId')
 
-`NOTE`: This command works for all AWS Lambda functions; not just the ones you deploy using SAM.
-
-```bash
-sam-alarm-context$ sam logs -n HelloWorldFunction --stack-name "sam-alarm-context" --tail
-```
-
-You can find more information and examples about filtering Lambda function logs in the [SAM CLI Documentation](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-logging.html).
-
-## Tests 
-
-Tests are defined in the `tests` folder in this project. Use PIP to install the test dependencies and run tests.
-
-```bash
-sam-alarm-context$ pip install -r tests/requirements.txt --user
-# unit test
-sam-alarm-context$ python -m pytest tests/unit -v
-# integration test, requiring deploying the stack first.
-# Create the env variable AWS_SAM_STACK_NAME with the name of the stack we are testing
-sam-alarm-context$ AWS_SAM_STACK_NAME="sam-alarm-context" python -m pytest tests/integration -v
-```
-
-## Cleanup
-
-To delete the sample application that you created, use the AWS CLI. Assuming you used your project name for the stack name, you can run the following:
-
-```bash
-sam delete --stack-name "sam-alarm-context"
-```
-
-## Resources
-
-See the [AWS SAM developer guide](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/what-is-sam.html) for an introduction to SAM specification, the SAM CLI, and serverless application concepts.
-
-Next, you can use AWS Serverless Application Repository to deploy ready to use Apps that go beyond hello world samples and learn how authors developed their applications: [AWS Serverless Application Repository main page](https://aws.amazon.com/serverless/serverlessrepo/)
+        if instance_id:
+            ec2 = boto3.client('ec2', region_name=region)
+            try:
+                response = ec2.describe_instances(InstanceIds=[instance_id])
+                instance_details = response['Reservations'][0]['Instances'][0]
+            except botocore.exceptions.ClientError as error:
+                logger.exception("Error describing EC2 instance")
+                raise RuntimeError("Unable to fulfill request") from error
+            
+            resource_information = get_html_table("EC2 Instance Details", instance_details)
+            # Further processing and dashboard generation
