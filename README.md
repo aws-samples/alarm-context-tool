@@ -1,6 +1,6 @@
-# Alarm Context Tool
+# Alarm Context Tool (ACT)
 
-This project enhances AWS CloudWatch Alarms by providing additional context to aid in troubleshooting. It leverages AWS Lambda, CloudWatch, X-Ray, and other AWS services to gather and present relevant information.
+The Alarm Context Tool (ACT) enhances AWS CloudWatch Alarms by providing additional context to aid in troubleshooting and analysis. By leveraging AWS services such as Lambda, CloudWatch, X-Ray, and Amazon Bedrock, this solution aggregates and analyzes metrics, logs, and traces to generate meaningful insights. Using generative AI capabilities from Amazon Bedrock, it summarizes findings, identifies potential root causes, and offers relevant documentation links to help operators resolve issues more efficiently. The implementation is designed for easy deployment and integration into existing observability pipelines, significantly reducing response times and improving root cause analysis.
 
 ## Table of Contents
 - [Prerequisites](#prerequisites)
@@ -8,38 +8,42 @@ This project enhances AWS CloudWatch Alarms by providing additional context to a
 - [Deployment](#deployment)
 - [Usage](#usage)
 - [Creating a New Handler](#creating-a-new-handler)
+- [Environment Variables](#environment-variables)
 - [Available Functions](#available-functions)
 
 ## Prerequisites
-1. AWS CLI configured with appropriate permissions.
-2. Python 3.8 or later.
-3. AWS SAM CLI for deployment.
+1. [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) configured with appropriate permissions.
+2. [Python 3.12](https://www.python.org/downloads/) or later if you plan to use your IDE to detect problems in the code.
+3. [AWS SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html) for deployment.
+4. [Access to Anthropic Bedrock foundation models](https://docs.aws.amazon.com/bedrock/latest/userguide/model-access.html)
 
 ## Setup
 1. Clone the repository:
     ```sh
-    git clone https://github.com/your-repo/alarm-context.git    
-    cd alarm-context  
+    git clone https://github.com/aws-samples/alarm-context-tool
+    cd alarm-context
     ```
 
-2. Install dependencies:
+2. Install dependencies if you plan to use your IDE to detect problems in the code:
     ```sh
     pip install -r requirements.txt
     ```
 
 ## Deployment
-1. Package the SAM application:
+1. Use a guided deployment to start with:
     ```sh
-    sam package --output-template-file packaged.yaml --s3-bucket YOUR_S3_BUCKET_NAME
+    sam build
+    sam deploy --guided
     ```
 
-2. Deploy the packaged application:
+2. Subsequently, you can build, deploy and test using the following command:
+    The test-event must be shared.
     ```sh
-    sam deploy --template-file packaged.yaml --stack-name alarm-context --capabilities CAPABILITY_IAM
+    sam build; sam deploy --no-confirm-changeset; sam remote invoke --stack-name alarm-context --test-event-name test-event
     ```
 
 ## Usage
-Once deployed, the Lambda function will be triggered by CloudWatch Alarms. The function will enhance the alarm message with additional context such as related metrics, logs, and traces.
+Once deployed, the Lambda function will be triggered by CloudWatch Alarms. The function will enhance the alarm message with additional context such as related metrics, logs, and traces. It uses Amazon Bedrock to analyze the gathered data and generate actionable insights.
 
 ## Creating a New Handler
 To create a new handler for a different AWS service, follow these steps:
@@ -68,73 +72,63 @@ To create a new handler for a different AWS service, follow these steps:
     Update `lambda_function.py` to import and call your new handler based on the trigger.
 
 4. **Update the template**:
-    Modify `template.yaml` to include your new handler if necessary.
+    Modify `template.yaml` to include your new handler and update necessary permissions.
 
-## Available Functions
-The following functions are available to use within handlers:
-
-- **build_dashboard**: Generates CloudWatch dashboard widgets based on provided metrics.
-    ```python
-    from functions_metrics import build_dashboard
+    ```yaml
+    Resources:
+      AlarmContextFunction:
+        Type: AWS::Serverless::Function
+          Handler: lambda_function.alarm_handler
+          Runtime: python3.12
+          Policies:
+            - Statement:
+                - Effect: Allow
+                  Action:
+                    - new-service:Describe*
+                  Resource: "*"
     ```
 
-- **get_metrics_from_dashboard_metrics**: Extracts metrics data from dashboard metrics.
-    ```python
-    from functions_metrics import get_metrics_from_dashboard_metrics
-    ```
+5. **Add necessary permissions**:
+    Ensure that your new handler has the required permissions by updating the `template.yaml` file as shown above.
 
-- **get_last_10_events**: Retrieves the last 10 log events from a specified log group.
-    ```python
-    from functions_logs import get_last_10_events
-    ```
+## Environment Variables
+The following environment variables can be configured for the Lambda function:
 
-- **get_log_insights_link**: Generates a CloudWatch Log Insights link for querying logs.
-    ```python
-    from functions_logs import get_log_insights_link
-    ```
+- `AWS_LAMBDA_LOG_LEVEL`: Sets the log level for AWS Lambda logs (e.g., INFO, DEBUG). Default is `INFO`.
+- `ANTHROPIC_VERSION`: Specifies the version of the Anthropic model to be used. Default is `bedrock-2023-05-31`.
+- `BEDROCK_MODEL_ID`: The ID of the Amazon Bedrock model to use. Default is `anthropic.claude-3-sonnet-20240229-v1:0`.
+- `BEDROCK_REGION`: The AWS region where the Bedrock model is deployed. Default is `us-east-1`.
+- `BEDROCK_MAX_TOKENS`: The maximum number of tokens to be used by the Bedrock model. Default is `4000`.
+- `METRIC_ROUNDING_PRECISION_FOR_BEDROCK`: The precision for rounding metrics before sending to Bedrock. Default is `3`.
+- `POWERTOOLS_LOG_LEVEL`: Sets the log level for AWS Lambda Powertools logs (e.g., INFO, DEBUG). Default is `INFO`.
+- `POWERTOOLS_LOGGER_LOG_EVENT`: Enables logging of the full event in Lambda Powertools logs. Default is `True`.
+- `POWERTOOLS_SERVICE_NAME`: The name of the service to be used in Lambda Powertools. Default is `Alarm`.
+- `POWERTOOLS_TRACER_CAPTURE_RESPONSE`: Controls whether to capture the response in tracing. Default is `False`.
+- `RECIPIENT`: The email address to receive notifications. 
+- `SENDER`: The sender's email address for notifications. 
+- `USE_BEDROCK`: Enables or disables the use of Amazon Bedrock for generative AI. Default is `True`.
 
-- **process_traces**: Processes X-Ray traces based on a filter expression.
-    ```python
-    from functions_xray import process_traces
-    ```
 
-- **get_dashboard_button**: Creates a button link for the CloudWatch dashboard.
-    ```python
-    from functions import get_dashboard_button
-    ```
+To configure these variables, update the `template.yaml` file:
 
-- **get_html_table**: Converts data into an HTML table format.
-    ```python
-    from functions import get_html_table
-    ```
-
-### Example Handler
-Here is an example of a simple handler for EC2:
-
-```python
-import boto3
-import botocore
-from aws_lambda_powertools import Logger, Tracer
-from functions import get_html_table
-from functions_metrics import build_dashboard
-
-logger = Logger()
-tracer = Tracer()
-
-@tracer.capture_method
-def process_ec2(dimensions, region, account_id, namespace, change_time, annotation_time, start_time, end_time, start, end):
-    if dimensions:
-        dimension_values = {element['name']: element['value'] for element in dimensions}
-        instance_id = dimension_values.get('InstanceId')
-
-        if instance_id:
-            ec2 = boto3.client('ec2', region_name=region)
-            try:
-                response = ec2.describe_instances(InstanceIds=[instance_id])
-                instance_details = response['Reservations'][0]['Instances'][0]
-            except botocore.exceptions.ClientError as error:
-                logger.exception("Error describing EC2 instance")
-                raise RuntimeError("Unable to fulfill request") from error
-            
-            resource_information = get_html_table("EC2 Instance Details", instance_details)
-            # Further processing and dashboard generation
+```yaml
+Resources:
+  AlarmContextFunction:
+    Type: AWS::Serverless::Function
+      Handler: lambda_function.alarm_handler
+      Runtime: python3.12
+      Environment:
+        Variables:
+          AWS_LAMBDA_LOG_LEVEL: INFO
+          ANTHROPIC_VERSION: bedrock-2023-05-31
+          BEDROCK_MODEL_ID: anthropic.claude-3-sonnet-20240229-v1:0
+          BEDROCK_REGION: us-east-1
+          BEDROCK_MAX_TOKENS: 4000
+          METRIC_ROUNDING_PRECISION_FOR_BEDROCK: 3
+          POWERTOOLS_LOG_LEVEL: INFO
+          POWERTOOLS_LOGGER_LOG_EVENT: "True"
+          POWERTOOLS_SERVICE_NAME: Alarm
+          POWERTOOLS_TRACER_CAPTURE_RESPONSE: "False"
+          RECIPIENT: alias@domain.com
+          SENDER: Name <alias@domain.com>
+          USE_BEDROCK: "True"   

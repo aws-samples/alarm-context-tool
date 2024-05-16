@@ -1,11 +1,11 @@
 version = 0.1
 [default.deploy.parameters]
-stack_name = "alarm-context"
+stack_name = "alarm-context-tool"
 resolve_s3 = true
-s3_prefix = "alarm-context"
+s3_prefix = "alarm-context-tool"
 region = "us-east-2"
 confirm_changeset = true
 capabilities = "CAPABILITY_IAM"
 image_repositories = []
 [default.remote_invoke.parameters]
-stack_name = "alarm-context"
+stack_name = "alarm-context-tool"

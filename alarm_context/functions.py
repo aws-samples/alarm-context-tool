@@ -20,11 +20,6 @@ def json_serial(obj):
 def create_test_case(event):
     # Extract the relevant SNS message part of the event
     sns_message = event['Records'][0]['Sns']
-    
-    # Assuming the Message is in JSON string format; parse it
-    #message_dict = json.loads(sns_message['Message'])
-    
-    # If the Message is already a dictionary, the above line is not needed and you can directly assign:
     message_dict = sns_message['Message']
     
     # Construct the test_case using the extracted data
