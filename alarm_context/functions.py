@@ -247,36 +247,3 @@ def get_html_table(title, items_dict):
             html_table += '<tr><td id="10"><b>%s</b></td><td id="11" colspan="2" style="word-wrap: break-all;">%s</td></tr>'  % (key, value)
     html_table += "</table>"
     return html_table
-
-    def process_value(val):
-        """Convert values to strings, handle dictionaries, lists, and apply JSON formatting if necessary."""
-        if isinstance(val, dict):
-            return '<br>'.join([f"{k}: {process_value(v)}" for k, v in val.items()])
-        elif isinstance(val, list):
-            return '<br>'.join([process_value(v) for v in val])
-        elif isinstance(val, (int, float)):
-            return f"{val:.3f}" if isinstance(val, float) else str(val)
-        elif pd.isnull(val):
-            return "N/A"
-        return val
-
-    # Convert the items_dict into a DataFrame for easier manipulation
-    df = pd.DataFrame(list(items_dict.items()), columns=["Key", "Value"]).applymap(process_value)
-
-    # Use Styler to generate HTML table, add title, and apply custom CSS
-    styler = df.style.hide().set_table_attributes('id="info" width="640" style="word-wrap: anywhere; max-width:640px !important; border-collapse: collapse; margin-bottom:10px;" cellpadding="2" cellspacing="0" width="100%" align="center" border="0"').set_caption(title)
-
-    # Custom CSS for styling the table, headers, and rows
-    css = """
-    <style>
-        table#info tr { border:1px solid #232F3E; }
-        table#info th { background-color: #f2f2f2; }
-        table#info tr:nth-child(even) { background-color:#D4DADA; }
-        table#info tr:nth-child(odd) { background-color:#F1F3F3; }
-        table#info td, table#info th { padding: 8px; text-align: left; }
-        table#info caption { caption-side: top; font-size: 1.5em; font-weight: bold; text-align: center; padding: 10px; }
-    </style>
-    """
-    
-    # Return the styled HTML table as a string, with custom CSS applied
-    return css + styler.to_html()
