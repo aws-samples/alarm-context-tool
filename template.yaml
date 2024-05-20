@@ -8,6 +8,7 @@ Resources:
     Properties:
       DisplayName: "Alarm Context DLQ"
       TopicName: "AlarmContextToolDLQ"
+      KmsMasterKeyId: alias/aws/sns
 
   DependenciesLayer:
     Type: AWS::Serverless::LayerVersion
