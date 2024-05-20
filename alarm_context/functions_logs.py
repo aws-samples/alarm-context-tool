@@ -103,23 +103,9 @@ def get_log_insights_query_results(log_group, log_insights_query, region):
             }
         )
     except botocore.exceptions.WaiterError as error:
-        logger.exception("Error waiting for query to complete")
+        logger.warning("Error waiting for query to complete")
         raise RuntimeError("Unable to fullfil request") from error    
 
-    response = None
-
-    while response is None or response['status'] == 'Running':
-        time.sleep(1)
-        try:
-            response = logs.get_query_results(
-                queryId=query_id
-            )
-        except botocore.exceptions.ClientError as error:
-            logger.exception("Error starting query")
-            raise RuntimeError("Unable to fullfil request") from error  
-        except botocore.exceptions.ParamValidationError as error:
-            raise ValueError('The parameters you provided are incorrect: {}'.format(error)) 
-    
     log_insights_query_results_json = response['results']
 
     # Step 1: Extract all unique field names

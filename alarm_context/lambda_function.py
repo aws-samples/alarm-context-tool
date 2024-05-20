@@ -15,6 +15,9 @@
 # Add Log Insights Queries - Done
 # Look at each handler to see where Log Insights Queries can be used
 # Remove IDS from TD get_html_table and clean up HTML
+#       DeadLetterQueue:
+#         Type: SNS
+#         TargetArn: arn:aws:sns:us-east-2:123456789012:my-topic
 
 
 # Import required libraries and modules

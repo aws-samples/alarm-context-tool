@@ -248,17 +248,6 @@ def get_html_table(title, items_dict):
     html_table += "</table>"
     return html_table
 
-
-    """
-    Returns an HTML table with the specified title and items_dict.
-
-    Parameters:
-    - title (str): Title of the table.
-    - items_dict (dict): Dictionary containing the data to populate the table.
-
-    Returns:
-    - str: HTML table as a string.
-    """
     def process_value(val):
         """Convert values to strings, handle dictionaries, lists, and apply JSON formatting if necessary."""
         if isinstance(val, dict):

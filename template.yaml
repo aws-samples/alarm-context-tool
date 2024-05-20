@@ -2,6 +2,13 @@ AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
 Description: A Lambda function to add context to CloudWatch Alarms
 Resources:
+
+  AlarmContextToolSNSTopic:
+    Type: "AWS::SNS::Topic"
+    Properties:
+      DisplayName: "Alarm Context DLQ"
+      TopicName: "AlarmContextToolDLQ"
+
   DependenciesLayer:
     Type: AWS::Serverless::LayerVersion
     Properties:
@@ -15,7 +22,10 @@ Resources:
   AlarmContextFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: alarm_context/
+      CodeUri: alarm_context_tool/
+      DeadLetterQueue:
+        Type: SNS
+        TargetArn: !GetAtt AlarmContextToolSNSTopic.TopicArn
       Description: >-
         A Lambda function to add context to CloudWatch Alarms
       MemorySize: 1024
@@ -40,7 +50,7 @@ Resources:
           POWERTOOLS_TRACER_CAPTURE_RESPONSE: "False"
           RECIPIENT: aliving@amazon.com
           SENDER: Alex Livingstone <aliving@amazon.com>
-          USE_BEDROCK: "True"          
+          USE_BEDROCK: "True"    
       EventInvokeConfig:
         MaximumEventAgeInSeconds: 21600
         MaximumRetryAttempts: 2
@@ -103,6 +113,10 @@ Resources:
                 - arn:aws:apigateway:*::/apis/*/stages/*                
                 - arn:aws:apigateway:*::/restapis
                 - arn:aws:apigateway:*::/restapis/*   
+            - Effect: Allow
+              Action: 
+                - sns:Publish
+              Resource: !GetAtt AlarmContextToolSNSTopic.TopicArn
       ReservedConcurrentExecutions: 10        
       Tracing: Active
       LoggingConfig:

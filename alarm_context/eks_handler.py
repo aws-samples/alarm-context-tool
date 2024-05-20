@@ -759,18 +759,6 @@ def process_eks(metric_name, dimensions, region, account_id, namespace, change_t
             # Should not get here
             logger.info("Unexpected Dimensions") 
 
-    elif metric_name:
-        contextual_links = None
-        log_information = None
-        log_events = None
-        resource_information = None
-        resource_information_object = None
-        widget_images = None
-        additional_metrics_with_timestamps_removed = None
-        trace_summary = None
-        trace = None
-        notifications = None
-        tags = None
     else:
         contextual_links = None
         log_information = None

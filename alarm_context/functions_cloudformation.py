@@ -113,8 +113,6 @@ def truncate_values(obj, max_length=100):
         return {k: truncate_values(v, max_length) for k, v in obj.items()}
     elif isinstance(obj, list):
         return [truncate_values(item, max_length) for item in obj]
-    elif not isinstance(obj, (dict, list, str)):
-        return obj
     else:
         return obj
 
