@@ -29,6 +29,7 @@ Resources:
         TargetArn: !GetAtt AlarmContextToolSNSTopic.TopicArn
       Description: >-
         A Lambda function to add context to CloudWatch Alarms
+      KmsMasterKeyId: alias/aws/lambda
       MemorySize: 1024
       Timeout: 900
       Handler: lambda_function.alarm_handler
