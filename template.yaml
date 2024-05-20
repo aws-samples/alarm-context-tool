@@ -3,6 +3,50 @@ Transform: AWS::Serverless-2016-10-31
 Description: A Lambda function to add context to CloudWatch Alarms
 Resources:
 
+  AlarmContextToolKMSKey:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: Key for encrypting Lambda environment variables
+      KeyPolicy:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: 
+              AWS: !Sub arn:aws:iam::${AWS::AccountId}:root
+            Action: 
+              - "kms:*"
+            Resource: "*"
+
+  AlarmContextToolKMSKeyAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: alias/lambda-env-vars
+      TargetKeyId: !Ref AlarmContextToolKMSKey
+
+  AlarmContextToolLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: LambdaKMSAccessPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - kms:Decrypt
+                  - kms:Encrypt
+                  - kms:GenerateDataKey
+                  - kms:GenerateDataKeyWithoutPlaintext
+                  - kms:DescribeKey
+                Resource: !GetAtt AlarmContextToolKMSKey.Arn
+
   AlarmContextToolSNSTopic:
   
     Type: "AWS::SNS::Topic"
@@ -22,6 +66,8 @@ Resources:
       BuildArchitecture: x86_64
 
   AlarmContextFunction:
+    Role: !GetAtt AlarmContextToolLambdaExecutionRole.Arn
+
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: alarm_context_tool/
@@ -30,7 +76,6 @@ Resources:
         TargetArn: !GetAtt AlarmContextToolSNSTopic.TopicArn
       Description: >-
         A Lambda function to add context to CloudWatch Alarms
-      KmsMasterKeyId: alias/aws/lambda-env-vars
       MemorySize: 1024
       Timeout: 900
       Handler: lambda_function.alarm_handler
