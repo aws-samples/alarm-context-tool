@@ -90,6 +90,22 @@ def get_log_insights_query_results(log_group, log_insights_query, region):
 
     query_id = start_query_response['queryId']
 
+
+    # Create a waiter for the query to complete
+    waiter = logs.get_waiter('query_complete')
+
+    try:
+        waiter.wait(
+            queryId=query_id,
+            WaiterConfig={
+                'Delay': 1,  # Wait for 1 second between each poll
+                'MaxAttempts': 120  # Maximum number of attempts (2 minutes)
+            }
+        )
+    except botocore.exceptions.WaiterError as error:
+        logger.exception("Error waiting for query to complete")
+        raise RuntimeError("Unable to fullfil request") from error    
+
     response = None
 
     while response is None or response['status'] == 'Running':

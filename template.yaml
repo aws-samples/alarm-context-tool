@@ -102,7 +102,8 @@ Resources:
                 - arn:aws:apigateway:*::/apis/*/stages
                 - arn:aws:apigateway:*::/apis/*/stages/*                
                 - arn:aws:apigateway:*::/restapis
-                - arn:aws:apigateway:*::/restapis/*           
+                - arn:aws:apigateway:*::/restapis/*   
+      ReservedConcurrentExecutions: 10        
       Tracing: Active
       LoggingConfig:
         LogFormat: JSON 
