@@ -113,40 +113,94 @@ Resources:
               Action:
                 - ec2:DescribeInstances
                 - ec2:DescribeImages
+              Resource: "*"
+            - Effect: Allow
+              Action:        
                 - sns:GetTopicAttributes
+              Resource: "*"
+            - Effect: Allow
+              Action:              
                 - synthetics:DescribeCanariesLastRun
                 - synthetics:DescribeCanaries
                 - synthetics:GetCanaryRuns
+              Resource: "*" 
+            - Effect: Allow
+              Action:
                 - elasticloadbalancing:DescribeLoadBalancers
                 - elasticloadbalancing:DescribeTags
-                - elasticloadbalancing:DescribeTargetGroups                
+                - elasticloadbalancing:DescribeTargetGroups 
+              Resource: "*"
+            - Effect: Allow
+              Action:               
                 - logs:DescribeLogGroups
                 - logs:DescribeLogStreams
+                - logs:GetLogEvents
+                - logs:FilterLogEvents                
+                - logs:FilterLogEvents
+              Resource: "*"
+            - Effect: Allow
+              Action:
                 - lambda:GetFunction
+              Resource: "*"
+            - Effect: Allow
+              Action:
                 - ses:SendRawEmail
+              Resource: "*"
+            - Effect: Allow
+              Action:
                 - ecs:DescribeClusters
                 - ecs:DescribeTaskDefinition
+                - ecs:DescribeServices
+              Resource: "*"
+            - Effect: Allow
+              Action:
                 - ssm:DescribeInstanceInformation
+              Resource: "*"
+            - Effect: Allow
+              Action:
                 - dynamodb:DescribeTable
                 - dynamodb:ListTagsOfResource
+              Resource: "*"
+            - Effect: Allow
+              Action:
                 - autoscaling:DescribeAutoScalingGroups
-                - logs:GetLogEvents
-                - logs:FilterLogEvents
-                - ecs:DescribeServices
-                - logs:FilterLogEvents
+              Resource: "*"
+            - Effect: Allow
+              Action:
                 - cloudwatch:GetMetricWidgetImage
                 - cloudwatch:GetMetricData
                 - cloudwatch:DescribeAlarmHistory
+              Resource: "*"
+            - Effect: Allow
+              Action:
                 - xray:GetTraceSummaries
                 - xray:BatchGetTraces
-                - ssm:ListCommands     
+              Resource: "*"
+            - Effect: Allow
+              Action:
+                - ssm:ListCommands
+              Resource: "*" 
+            - Effect: Allow
+              Action:    
                 - health:DescribeEvents
-                - health:DescribeEventDetails    
-                - cloudformation:GetTemplate    
+                - health:DescribeEventDetails
+              Resource: "*" 
+            - Effect: Allow
+              Action:   
+                - cloudformation:GetTemplate
+              Resource: "*"  
+            - Effect: Allow
+              Action:  
                 - rds:DescribeDBClusters
                 - rds:DescribeDBInstances
+              Resource: "*"
+            - Effect: Allow
+              Action:
                 - pi:ListAvailableResourceMetrics
                 - pi:GetResourceMetrics
+              Resource: "*"
+            - Effect: Allow
+              Action:
                 - eks:DescribeCluster
               Resource: "*"
             - Effect: Allow
