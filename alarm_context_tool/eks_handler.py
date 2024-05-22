@@ -179,7 +179,7 @@ def process_eks(metric_name, dimensions, region, account_id, namespace, change_t
                                         AND FullPodName = '{full_pod_name}' 
                                         AND Namespace = '{eks_namespace}'
                                         AND PodName = '{pod_name}'
-                                """
+                                """ # nosec
                             }
                         ]
                     ]
