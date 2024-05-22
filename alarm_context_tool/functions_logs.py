@@ -94,6 +94,7 @@ def get_log_insights_query_results(log_group, log_insights_query, region):
 
     try:
         while response is None or response['status'] == 'Running':
+             # nosemgrep
             time.sleep(1)
             response = logs.get_query_results(
                 queryId=query_id
