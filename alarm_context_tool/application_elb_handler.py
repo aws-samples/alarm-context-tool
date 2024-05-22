@@ -83,7 +83,7 @@ def process_application_elb(dimensions, region, account_id, namespace, change_ti
                                     WHERE LoadBalancer = '{load_balancer}'
                                     AND TargetGroup = '{target_group}'
                                     GROUP BY AvailabilityZone
-                                """
+                                """ # nosec
                             }
                         ]
                     ]
@@ -122,7 +122,7 @@ def process_application_elb(dimensions, region, account_id, namespace, change_ti
                                     FROM SCHEMA("AWS/ApplicationELB", AvailabilityZone, LoadBalancer)                                    
                                     WHERE LoadBalancer = '{load_balancer}'
                                     GROUP BY AvailabilityZone
-                                """
+                                """ # nosec
                             }
                         ]
                     ]

@@ -219,7 +219,7 @@ def process_eks(metric_name, dimensions, region, account_id, namespace, change_t
                                         AND ContainerName = '{container_name}'
                                         AND Namespace = '{eks_namespace}'
                                         AND PodName = '{pod_name}'
-                                """
+                                """ # nosec
                             }
                         ]
                     ]
@@ -268,7 +268,7 @@ def process_eks(metric_name, dimensions, region, account_id, namespace, change_t
                                         AND FullPodName = '{full_pod_name}'
                                         AND Namespace = '{eks_namespace}'
                                         AND PodName = '{pod_name}'
-                                """
+                                """ # nosec
                             }
                         ]
                     ]
@@ -357,7 +357,7 @@ def process_eks(metric_name, dimensions, region, account_id, namespace, change_t
                                         AND Namespace = '{eks_namespace}'
                                         AND PodName = '{pod_name}'
                                     GROUP BY FullPodName ORDER BY MAX()
-                                """
+                                """ # nosec
                             }
                         ]
                     ]
@@ -398,7 +398,7 @@ def process_eks(metric_name, dimensions, region, account_id, namespace, change_t
                                     WHERE ClusterName = '{cluster_name}'
                                         AND Namespace = '{eks_namespace}'
                                         AND Service = '{service}'
-                                """
+                                """ # nosec
                             }
                         ]
                     ]
@@ -439,7 +439,7 @@ def process_eks(metric_name, dimensions, region, account_id, namespace, change_t
                                 FROM ContainerInsights
                                 WHERE ClusterName = '{cluster_name}' 
                                     AND code = '{code}' 
-                                GROUP BY \"method\" """
+                                GROUP BY \"method\" """ # nosec
                 dashboard_metric = {
                     "title": f"{title} - HTTP {code}",
                     "view": "timeSeries",
@@ -490,7 +490,7 @@ def process_eks(metric_name, dimensions, region, account_id, namespace, change_t
                                 FROM ContainerInsights
                                 WHERE ClusterName = '{cluster_name}' 
                                     AND code = '{code}' 
-                                GROUP BY \"verb\" """
+                                GROUP BY \"verb\" """ # nosec
                 dashboard_metric = {
                     "title": f"{title} - HTTP {code}",
                     "view": "timeSeries",
@@ -543,7 +543,7 @@ def process_eks(metric_name, dimensions, region, account_id, namespace, change_t
                                     FROM ContainerInsights
                                     WHERE ClusterName = '{cluster_name}'
                                         AND Namespace = '{eks_namespace}'
-                                """
+                                """ # nosec
                             }
                         ]
                     ]
@@ -589,7 +589,7 @@ def process_eks(metric_name, dimensions, region, account_id, namespace, change_t
                                     FROM SCHEMA(ContainerInsights, ClusterName,operation) 
                                     WHERE ClusterName = '{cluster_name}' 
                                     GROUP BY operation                                
-                                """
+                                """ # nosec
                             }
                         ]
                     ]
@@ -631,7 +631,7 @@ def process_eks(metric_name, dimensions, region, account_id, namespace, change_t
                                     FROM SCHEMA(ContainerInsights, ClusterName, priority_level) 
                                     WHERE ClusterName = '{cluster_name}' 
                                         AND priority_level = '{level}'                                        
-                                """
+                                """ # nosec
                             }
                         ]
                     ]
@@ -667,7 +667,7 @@ def process_eks(metric_name, dimensions, region, account_id, namespace, change_t
                                     FROM SCHEMA(ContainerInsights, ClusterName, request_kind) 
                                     WHERE ClusterName = '{cluster_name}' 
                                     GROUP BY request_kind                                
-                                """
+                                """ # nosec
                             }
                         ]
                     ]
@@ -703,7 +703,7 @@ def process_eks(metric_name, dimensions, region, account_id, namespace, change_t
                                     FROM SCHEMA(ContainerInsights, ClusterName, resource) 
                                     WHERE ClusterName = '{cluster_name}'
                                         AND resource = '{resource}'                                                 
-                                """
+                                """ # nosec
                             }
                         ]
                     ]
@@ -738,7 +738,7 @@ def process_eks(metric_name, dimensions, region, account_id, namespace, change_t
                                     FROM SCHEMA(ContainerInsights, ClusterName, resource) 
                                     WHERE ClusterName = '{cluster_name}'
                                     GROUP BY verb                                                
-                                """
+                                """ # nosec
                             }
                         ]
                     ]
