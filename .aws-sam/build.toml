@@ -17,6 +17,7 @@ reason = "Wildcards are required for permissions to apply read permissions to an
 id = "W89"
 reason = "The Lambda function needs to access resources over the Internet"
 
+
 [layer_build_definitions.c6f6bdde-b53d-47e1-92e7-257775f0e314]
 layer_name = "DependenciesLayer"
 codeuri = "/Users/aliving/alarm-context/dependencies_layer"

@@ -1,14 +1,3 @@
-# Manually trigger an alarm using the following command:
-# aws cloudwatch set-alarm-state --state-value ALARM --state-reason "Testing" --alarm-name "myalarm"
-# aws cloudwatch set-alarm-state --state-value ALARM --state-reason "Testing" --alarm-name ""
-#
-# Supports Anthropic Claude Models:
-#   Anthropic Claude Instant v1.2
-#   Anthropic Claude 2 v2
-#   Anthropic Claude 2 v2.1
-#   Anthropic Claude 3 Sonnet
-#   Anthropic Claude 3 Haiku
-
 # TO DO
 # update test case function - DONE, COULD IMPROVE?
 # Alarms created with Metric Insights queries will not have a namespace or dimensions
@@ -16,10 +5,6 @@
 # Look at each handler to see where Log Insights Queries can be used
 # Use Log Patterns in Log Insights Queries instead of last 10 of events
 # Remove IDS from TD get_html_table and clean up HTML
-#       DeadLetterQueue:
-#         Type: SNS
-#         TargetArn: arn:aws:sns:us-east-2:123456789012:my-topic
-
 
 # Import required libraries and modules
 import boto3

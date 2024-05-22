@@ -17,6 +17,13 @@ The Alarm Context Tool (ACT) enhances AWS CloudWatch Alarms by providing additio
 2. [Python 3.12](https://www.python.org/downloads/) or later if you plan to use your IDE to detect problems in the code.
 3. [AWS SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html) for deployment.
 4. [Access to Anthropic Bedrock foundation models](https://docs.aws.amazon.com/bedrock/latest/userguide/model-access.html)
+	- Supports Anthropic Claude Models:
+		- Anthropic Claude Instant v1.2
+		- Anthropic Claude 2 v2
+		- Anthropic Claude 2 v2.1
+		- Anthropic Claude 3 Sonnet
+		- Anthropic Claude 3 Haiku
+		- Anthropic Claude 3 Opus
 
 ## Dependencies
 - [markdown](https://pypi.org/project/Markdown/)
@@ -99,6 +106,12 @@ To create a new handler for a different AWS service, follow these steps:
 
 5. **Add necessary permissions**:
     Ensure that your new handler has the required permissions by updating the `template.yaml` file as shown above.
+
+1. **Testing**:
+  Manually trigger an alarm using the following command:
+    ```sh
+    aws cloudwatch set-alarm-state --state-value ALARM --state-reason "Testing" --alarm-name "<alarm_name>"
+    ```
 
 ## Environment Variables
 The following environment variables can be configured for the Lambda function:
