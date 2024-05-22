@@ -38,14 +38,14 @@ Resources:
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
-              - Effect: Allow
-                Action:
-                  - kms:Decrypt
-                  - kms:Encrypt
-                  - kms:GenerateDataKey
-                  - kms:GenerateDataKeyWithoutPlaintext
-                  - kms:DescribeKey
-                Resource: !GetAtt AlarmContextToolKMSKey.Arn
+            - Effect: Allow
+              Action:
+                - kms:Decrypt
+                - kms:Encrypt
+                - kms:GenerateDataKey
+                - kms:GenerateDataKeyWithoutPlaintext
+                - kms:DescribeKey
+              Resource: !GetAtt AlarmContextToolKMSKey.Arn
 
   AlarmContextToolSNSTopic:
   
@@ -70,7 +70,7 @@ Resources:
 
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: alarm_context_tool/
+      CodeUri: alarm_context_tool
       DeadLetterQueue:
         Type: SNS
         TargetArn: !GetAtt AlarmContextToolSNSTopic.TopicArn
@@ -114,22 +114,26 @@ Resources:
                 - ec2:DescribeInstances
                 - ec2:DescribeImages
               Resource: "*"
+        - Statement:
             - Effect: Allow
               Action:        
                 - sns:GetTopicAttributes
               Resource: "*"
+        - Statement:
             - Effect: Allow
               Action:              
                 - synthetics:DescribeCanariesLastRun
                 - synthetics:DescribeCanaries
                 - synthetics:GetCanaryRuns
               Resource: "*" 
+        - Statement:
             - Effect: Allow
               Action:
                 - elasticloadbalancing:DescribeLoadBalancers
                 - elasticloadbalancing:DescribeTags
                 - elasticloadbalancing:DescribeTargetGroups 
               Resource: "*"
+        - Statement:
             - Effect: Allow
               Action:               
                 - logs:DescribeLogGroups
@@ -138,75 +142,91 @@ Resources:
                 - logs:FilterLogEvents                
                 - logs:FilterLogEvents
               Resource: "*"
+        - Statement:
             - Effect: Allow
               Action:
                 - lambda:GetFunction
               Resource: "*"
+        - Statement:
             - Effect: Allow
               Action:
                 - ses:SendRawEmail
               Resource: "*"
+        - Statement:
             - Effect: Allow
               Action:
                 - ecs:DescribeClusters
                 - ecs:DescribeTaskDefinition
                 - ecs:DescribeServices
               Resource: "*"
+        - Statement:
             - Effect: Allow
               Action:
                 - ssm:DescribeInstanceInformation
               Resource: "*"
+        - Statement:
             - Effect: Allow
               Action:
                 - dynamodb:DescribeTable
                 - dynamodb:ListTagsOfResource
               Resource: "*"
+        - Statement:
             - Effect: Allow
               Action:
                 - autoscaling:DescribeAutoScalingGroups
               Resource: "*"
+        - Statement:
             - Effect: Allow
               Action:
                 - cloudwatch:GetMetricWidgetImage
                 - cloudwatch:GetMetricData
                 - cloudwatch:DescribeAlarmHistory
               Resource: "*"
+        - Statement:
             - Effect: Allow
               Action:
                 - xray:GetTraceSummaries
                 - xray:BatchGetTraces
               Resource: "*"
+        - Statement:
             - Effect: Allow
               Action:
                 - ssm:ListCommands
               Resource: "*" 
+        - Statement:
             - Effect: Allow
               Action:    
                 - health:DescribeEvents
                 - health:DescribeEventDetails
               Resource: "*" 
+        - Statement:
             - Effect: Allow
               Action:   
                 - cloudformation:GetTemplate
               Resource: "*"  
+        - Statement:
             - Effect: Allow
               Action:  
                 - rds:DescribeDBClusters
                 - rds:DescribeDBInstances
               Resource: "*"
+        - Statement:
             - Effect: Allow
               Action:
                 - pi:ListAvailableResourceMetrics
                 - pi:GetResourceMetrics
               Resource: "*"
+        - Statement:
             - Effect: Allow
               Action:
                 - eks:DescribeCluster
               Resource: "*"
+        - Statement:
             - Effect: Allow
               Action:
                 - bedrock:InvokeModel
               Resource: arn:*:bedrock:*::foundation-model/*
+        - Statement:
             - Effect: Allow
               Action: 
                 - apigateway:GET
@@ -215,6 +235,7 @@ Resources:
                 - arn:aws:apigateway:*::/apis/*/stages/*                
                 - arn:aws:apigateway:*::/restapis
                 - arn:aws:apigateway:*::/restapis/*   
+        - Statement:
             - Effect: Allow
               Action: 
                 - sns:Publish

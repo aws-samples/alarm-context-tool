@@ -14,6 +14,7 @@
 # Alarms created with Metric Insights queries will not have a namespace or dimensions
 # Add Log Insights Queries - Done
 # Look at each handler to see where Log Insights Queries can be used
+# Use Log Patterns in Log Insights Queries instead of last 10 of events
 # Remove IDS from TD get_html_table and clean up HTML
 #       DeadLetterQueue:
 #         Type: SNS
