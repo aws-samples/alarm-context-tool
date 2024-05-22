@@ -3,7 +3,8 @@
 The Alarm Context Tool (ACT) enhances AWS CloudWatch Alarms by providing additional context to aid in troubleshooting and analysis. By leveraging AWS services such as Lambda, CloudWatch, X-Ray, and Amazon Bedrock, this solution aggregates and analyzes metrics, logs, and traces to generate meaningful insights. Using generative AI capabilities from Amazon Bedrock, it summarizes findings, identifies potential root causes, and offers relevant documentation links to help operators resolve issues more efficiently. The implementation is designed for easy deployment and integration into existing observability pipelines, significantly reducing response times and improving root cause analysis.
 
 ## Table of Contents
-- [Prerequisites](#prerequisites)
+- [Dependencies](#prerequisites)
+- [Prerequisites](#dependencies)
 - [Setup](#setup)
 - [Deployment](#deployment)
 - [Usage](#usage)
@@ -16,6 +17,14 @@ The Alarm Context Tool (ACT) enhances AWS CloudWatch Alarms by providing additio
 2. [Python 3.12](https://www.python.org/downloads/) or later if you plan to use your IDE to detect problems in the code.
 3. [AWS SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html) for deployment.
 4. [Access to Anthropic Bedrock foundation models](https://docs.aws.amazon.com/bedrock/latest/userguide/model-access.html)
+
+## Dependencies
+- [markdown](https://pypi.org/project/Markdown/)
+- [boto3](https://pypi.org/project/boto3/)
+- [pandas](https://pypi.org/project/pandas/)
+- [dnspython](https://pypi.org/project/dnspython/)
+- [PyYAML](https://pypi.org/project/PyYAML/)
+- [cfn_flip](https://pypi.org/project/cfn-flip/)
 
 ## Setup
 1. Clone the repository:
