@@ -78,6 +78,8 @@ def process_application_elb(dimensions, region, account_id, namespace, change_ti
                     "metrics": [
                         [ 
                             {
+                                # B608: Possible SQL injection vector through string-based query construction.
+                                # Not applicable for Metric Insights Queries
                                 "expression": f"""SELECT {agg_function}({metric}) 
                                     FROM SCHEMA("AWS/ApplicationELB", AvailabilityZone, LoadBalancer, TargetGroup)
                                     WHERE LoadBalancer = '{load_balancer}'
@@ -118,6 +120,8 @@ def process_application_elb(dimensions, region, account_id, namespace, change_ti
                     "metrics": [
                         [ 
                             {
+                                # B608: Possible SQL injection vector through string-based query construction.
+                                # Not applicable for Metric Insights Queries                                 
                                 "expression": f"""SELECT {agg_function}({metric}) 
                                     FROM SCHEMA("AWS/ApplicationELB", AvailabilityZone, LoadBalancer)                                    
                                     WHERE LoadBalancer = '{load_balancer}'

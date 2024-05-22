@@ -173,6 +173,8 @@ def process_eks(metric_name, dimensions, region, account_id, namespace, change_t
                         [ 
                             {
                                 "label": "${LABEL}",
+                                # B608: Possible SQL injection vector through string-based query construction.
+                                # Not applicable for Metric Insights Queries                                
                                 "expression": f"""SELECT AVG({metric})
                                     FROM SCHEMA(ContainerInsights, ClusterName, FullPodName, Namespace, PodName)
                                     WHERE ClusterName = '{cluster_name}'
@@ -214,6 +216,8 @@ def process_eks(metric_name, dimensions, region, account_id, namespace, change_t
                         [ 
                             {
                                 "label": pod_name,
+                                # B608: Possible SQL injection vector through string-based query construction.
+                                # Not applicable for Metric Insights Queries                            
                                 "expression": f"""SELECT AVG({metric}) FROM ContainerInsights
                                     WHERE ClusterName = '{cluster_name}'
                                         AND ContainerName = '{container_name}'
@@ -262,6 +266,8 @@ def process_eks(metric_name, dimensions, region, account_id, namespace, change_t
                         [ 
                             {
                                 "label": "${LABEL}",
+                                # B608: Possible SQL injection vector through string-based query construction.
+                                # Not applicable for Metric Insights Queries                                 
                                 "expression": f"""SELECT {agg_function}({metric}) 
                                     FROM SCHEMA(ContainerInsights,ClusterName,FullPodName,Namespace,PodName)
                                     WHERE ClusterName = '{cluster_name}'
@@ -351,6 +357,8 @@ def process_eks(metric_name, dimensions, region, account_id, namespace, change_t
                         [
                             {
                                 "label": "${LABEL}",
+                                # B608: Possible SQL injection vector through string-based query construction.
+                                # Not applicable for Metric Insights Queries                                 
                                 "expression": f"""SELECT {metric['stat']}({metric['name']}) 
                                     FROM SCHEMA(ContainerInsights, ClusterName,FullPodName,Namespace,PodName)
                                     WHERE ClusterName = '{cluster_name}'
@@ -393,6 +401,8 @@ def process_eks(metric_name, dimensions, region, account_id, namespace, change_t
                         [
                             {
                                 "label": service,
+                                # B608: Possible SQL injection vector through string-based query construction.
+                                # Not applicable for Metric Insights Queries                                 
                                 "expression": f"""SELECT {metric['stat']}({metric['name']}) 
                                     FROM ContainerInsights
                                     WHERE ClusterName = '{cluster_name}'
@@ -435,6 +445,8 @@ def process_eks(metric_name, dimensions, region, account_id, namespace, change_t
 
             dashboard_metrics = []
             for code, title in status_codes.items():
+                # B608: Possible SQL injection vector through string-based query construction.
+                # Not applicable for Metric Insights Queries                 
                 expression = f"""SELECT AVG(rest_client_requests_total) 
                                 FROM ContainerInsights
                                 WHERE ClusterName = '{cluster_name}' 
@@ -486,6 +498,8 @@ def process_eks(metric_name, dimensions, region, account_id, namespace, change_t
 
             dashboard_metrics = []
             for code, title in status_codes.items():
+                # B608: Possible SQL injection vector through string-based query construction.
+                # Not applicable for Metric Insights Queries                 
                 expression = f"""SELECT AVG(apiserver_request_total) 
                                 FROM ContainerInsights
                                 WHERE ClusterName = '{cluster_name}' 
@@ -539,6 +553,8 @@ def process_eks(metric_name, dimensions, region, account_id, namespace, change_t
                         [
                             {
                                 "label": namespace,
+                                # B608: Possible SQL injection vector through string-based query construction.
+                                # Not applicable for Metric Insights Queries                                 
                                 "expression": f"""SELECT {metric['stat']}({metric['name']}) 
                                     FROM ContainerInsights
                                     WHERE ClusterName = '{cluster_name}'
@@ -585,6 +601,8 @@ def process_eks(metric_name, dimensions, region, account_id, namespace, change_t
                         [
                             {
                                 "label": operation,
+                                # B608: Possible SQL injection vector through string-based query construction.
+                                # Not applicable for Metric Insights Queries                                 
                                 "expression": f"""SELECT {metric['stat']}({metric['name']}) 
                                     FROM SCHEMA(ContainerInsights, ClusterName,operation) 
                                     WHERE ClusterName = '{cluster_name}' 
@@ -627,6 +645,8 @@ def process_eks(metric_name, dimensions, region, account_id, namespace, change_t
                         [ 
                             {
                                 "label": level,
+                                # B608: Possible SQL injection vector through string-based query construction.
+                                # Not applicable for Metric Insights Queries                                 
                                 "expression": f"""SELECT AVG(apiserver_flowcontrol_request_concurrency_limit) 
                                     FROM SCHEMA(ContainerInsights, ClusterName, priority_level) 
                                     WHERE ClusterName = '{cluster_name}' 
@@ -663,6 +683,8 @@ def process_eks(metric_name, dimensions, region, account_id, namespace, change_t
                         [
                             {
                                 "label": "${LABEL}",
+                                # B608: Possible SQL injection vector through string-based query construction.
+                                # Not applicable for Metric Insights Queries                                 
                                 "expression": f"""SELECT {metric['stat']}({metric['name']}) 
                                     FROM SCHEMA(ContainerInsights, ClusterName, request_kind) 
                                     WHERE ClusterName = '{cluster_name}' 
@@ -699,6 +721,8 @@ def process_eks(metric_name, dimensions, region, account_id, namespace, change_t
                         [
                             {
                                 "label": metric["name"],
+                                # B608: Possible SQL injection vector through string-based query construction.
+                                # Not applicable for Metric Insights Queries                                 
                                 "expression": f"""SELECT {metric['stat']}({metric['name']}) 
                                     FROM SCHEMA(ContainerInsights, ClusterName, resource) 
                                     WHERE ClusterName = '{cluster_name}'
@@ -734,6 +758,8 @@ def process_eks(metric_name, dimensions, region, account_id, namespace, change_t
                         [
                             {
                                 "label": metric["name"],
+                                # B608: Possible SQL injection vector through string-based query construction.
+                                # Not applicable for Metric Insights Queries                                 
                                 "expression": f"""SELECT {metric['stat']}({metric['name']}) 
                                     FROM SCHEMA(ContainerInsights, ClusterName, resource) 
                                     WHERE ClusterName = '{cluster_name}'
