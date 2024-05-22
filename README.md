@@ -163,3 +163,11 @@ See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more inform
 ## License
 
 This library is licensed under the MIT-0 License. See the LICENSE file.
+
+## TO DO
+- Update test case function - DONE, COULD IMPROVE?
+- Alarms created with Metric Insights queries will not have a namespace or dimensions
+- Add Log Insights Queries - Done
+- Look at each handler to see where Log Insights Queries can be used
+- Use Log Patterns in Log Insights Queries instead of last 10 of events
+- Remove IDS from TD get_html_table and clean up HTML

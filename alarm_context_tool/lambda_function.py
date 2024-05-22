@@ -1,11 +1,3 @@
-# TO DO
-# update test case function - DONE, COULD IMPROVE?
-# Alarms created with Metric Insights queries will not have a namespace or dimensions
-# Add Log Insights Queries - Done
-# Look at each handler to see where Log Insights Queries can be used
-# Use Log Patterns in Log Insights Queries instead of last 10 of events
-# Remove IDS from TD get_html_table and clean up HTML
-
 # Import required libraries and modules
 import boto3
 import json
