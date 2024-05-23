@@ -49,8 +49,13 @@ def describe_events(region):
 
 
     except botocore.exceptions.ClientError as error:
-        logger.exception("Error listing available resource metrics")
-        raise RuntimeError("Unable to fullfil request") from error  
+        error_code = error.response['Error']['Code']
+        if error_code == 'SubscriptionRequiredException':
+            logger.warning("You need a Business, Enterprise On-Ramp, or Enterprise Support plan from AWS Support to use this operation. Skipping health events.")
+            return {}
+        else:
+            logger.exception("Error describing health Events")
+            raise RuntimeError("Unable to fullfil request") from error  
     except botocore.exceptions.ParamValidationError as error:
         raise ValueError('The parameters you provided are incorrect: {}'.format(error))
     else:

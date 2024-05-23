@@ -37,11 +37,12 @@ The Alarm Context Tool (ACT) enhances AWS CloudWatch Alarms by providing additio
 1. Clone the repository:
     ```sh
     git clone https://github.com/aws-samples/alarm-context-tool
-    cd alarm-context
+    cd alarm-context-tool
     ```
 
 2. Install dependencies if you plan to use your IDE to detect problems in the code:
     ```sh
+    cd dependencies_layer 
     pip install -r requirements.txt
     ```
 
