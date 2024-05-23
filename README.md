@@ -24,6 +24,7 @@ The Alarm Context Tool (ACT) enhances AWS CloudWatch Alarms by providing additio
 		- Anthropic Claude 3 Sonnet
 		- Anthropic Claude 3 Haiku
 		- Anthropic Claude 3 Opus
+5. [Verified identity in Amazon SES](https://docs.aws.amazon.com/ses/latest/dg/verify-addresses-and-domains.html)
 
 ## Dependencies
 - [markdown](https://pypi.org/project/Markdown/)

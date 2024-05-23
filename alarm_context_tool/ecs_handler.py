@@ -51,7 +51,7 @@ def process_ecs(dimensions, region, account_id, namespace, change_time, annotati
                 response = ecs.describe_clusters(clusters=[id],include=['SETTINGS','STATISTICS','TAGS'])
             except botocore.exceptions.ClientError as error:
                 logger.exception("Error describing ECS Cluster")
-                raise RuntimeError("Unable to fullfil request") from error  
+                raise RuntimeError(f"Unable to fullfil request error encountered as : {error}") from error  
             except botocore.exceptions.ParamValidationError as error:
                 raise ValueError('The parameters you provided are incorrect: {}'.format(error))                        
                           
@@ -234,7 +234,7 @@ def process_ecs(dimensions, region, account_id, namespace, change_time, annotati
                 response = ecs.describe_services(cluster=cluster_name,services=[id],include=['TAGS'])
             except botocore.exceptions.ClientError as error:
                 logger.exception("Error describing ECS Service")
-                raise RuntimeError("Unable to fullfil request") from error  
+                raise RuntimeError(f"Unable to fullfil request error encountered as : {error}") from error  
             except botocore.exceptions.ParamValidationError as error:
                 raise ValueError('The parameters you provided are incorrect: {}'.format(error))                        
                           
@@ -251,7 +251,7 @@ def process_ecs(dimensions, region, account_id, namespace, change_time, annotati
                 response = ecs.describe_task_definition(taskDefinition=response['services'][0]['taskDefinition'],include=['TAGS',])
             except botocore.exceptions.ClientError as error:
                 logger.exception("Error describing ECS task definition")
-                raise RuntimeError("Unable to fullfil request") from error  
+                raise RuntimeError(f"Unable to fullfil request error encountered as : {error}") from error  
             except botocore.exceptions.ParamValidationError as error:
                 raise ValueError('The parameters you provided are incorrect: {}'.format(error))              
             

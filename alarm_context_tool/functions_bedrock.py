@@ -159,7 +159,7 @@ def execute_prompt(prompt):
             response = bedrock.invoke_model(body=body, modelId=os.environ.get('BEDROCK_MODEL_ID'))
         except botocore.exceptions.ClientError as error:
             logger.exception("Error calling Bedrock")
-            raise RuntimeError("Unable to fullfil request") from error  
+            raise RuntimeError(f"Unable to fullfil request error encountered as : {error}") from error  
         except botocore.exceptions.ParamValidationError as error:
             raise ValueError('The parameters you provided are incorrect: {}'.format(error))   
         

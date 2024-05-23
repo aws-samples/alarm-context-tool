@@ -124,7 +124,7 @@ def process_eks(metric_name, dimensions, region, account_id, namespace, change_t
                 response = eks.describe_cluster(name=cluster_name)   
             except botocore.exceptions.ClientError as error:
                 logger.exception("Error describing EKS Cluster")
-                raise RuntimeError("Unable to fullfil request") from error  
+                raise RuntimeError(f"Unable to fullfil request error encountered as : {error}") from error  
             except botocore.exceptions.ParamValidationError as error:
                 raise ValueError('The parameters you provided are incorrect: {}'.format(error)) 
             logger.info("Describe Cluster", extra=response)

@@ -84,7 +84,7 @@ def get_log_insights_query_results(log_group, log_insights_query, region):
         )
     except botocore.exceptions.ClientError as error:
         logger.exception("Error starting query")
-        raise RuntimeError("Unable to fullfil request") from error  
+        raise RuntimeError(f"Unable to fullfil request error encountered as : {error}") from error  
     except botocore.exceptions.ParamValidationError as error:
         raise ValueError('The parameters you provided are incorrect: {}'.format(error)) 
 
@@ -100,7 +100,7 @@ def get_log_insights_query_results(log_group, log_insights_query, region):
             )
     except botocore.exceptions.WaiterError as error:
         logger.warning("Error waiting for query to complete")
-        raise RuntimeError("Unable to fullfil request") from error    
+        raise RuntimeError(f"Unable to fullfil request error encountered as : {error}") from error    
 
     log_insights_query_results_json = response['results']
 
@@ -159,7 +159,7 @@ def get_last_10_events(log_input, timestamp, region):
                 )
             except botocore.exceptions.ClientError as error:
                 logger.exception("Error filtering log events")
-                raise RuntimeError("Unable to fullfil request") from error  
+                raise RuntimeError(f"Unable to fullfil request error encountered as : {error}") from error  
             except botocore.exceptions.ParamValidationError as error:
                 raise ValueError('The parameters you provided are incorrect: {}'.format(error))            
 
@@ -184,7 +184,7 @@ def get_last_10_events(log_input, timestamp, region):
             response = logs.filter_log_events(logGroupName=log_group_name, limit=10, endTime=int(timestamp.timestamp() * 1000))
         except botocore.exceptions.ClientError as error:
             logger.exception("Error filtering log events")
-            raise RuntimeError("Unable to fullfil request") from error  
+            raise RuntimeError(f"Unable to fullfil request error encountered as : {error}") from error  
         except botocore.exceptions.ParamValidationError as error:
             raise ValueError('The parameters you provided are incorrect: {}'.format(error)) 
         
@@ -230,7 +230,7 @@ def search_log_groups(log_stream_name, region):
         response = {'logGroups': log_groups_list}        
     except botocore.exceptions.ClientError as error:
         logger.exception("Error describing log groups")
-        raise RuntimeError("Unable to fullfil request") from error  
+        raise RuntimeError(f"Unable to fullfil request error encountered as : {error}") from error  
     except botocore.exceptions.ParamValidationError as error:
         raise ValueError('The parameters you provided are incorrect: {}'.format(error)) 
 
@@ -243,7 +243,7 @@ def search_log_groups(log_stream_name, region):
             response = logs.describe_log_streams(logGroupName=log_group['logGroupName'], logStreamNamePrefix=log_stream_name, limit=1)
         except botocore.exceptions.ClientError as error:
             logger.exception("Error describing Log Groups")
-            raise RuntimeError("Unable to fullfil request") from error  
+            raise RuntimeError(f"Unable to fullfil request error encountered as : {error}") from error  
         except botocore.exceptions.ParamValidationError as error:
             raise ValueError('The parameters you provided are incorrect: {}'.format(error))         
         if response['logStreams']:
@@ -271,7 +271,7 @@ def check_log_group_exists(log_group_name, region):
         response = {'logGroups': log_groups_list}        
     except botocore.exceptions.ClientError as error:
         logger.exception("Error describing log groups")
-        raise RuntimeError("Unable to fullfil request") from error  
+        raise RuntimeError(f"Unable to fullfil request error encountered as : {error}") from error  
     except botocore.exceptions.ParamValidationError as error:
         raise ValueError('The parameters you provided are incorrect: {}'.format(error))          
 

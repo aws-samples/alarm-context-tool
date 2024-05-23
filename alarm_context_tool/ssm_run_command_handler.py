@@ -63,7 +63,7 @@ def process_ssm_run_command(metric_name, dimensions, region, account_id, namespa
 
         except botocore.exceptions.ClientError as error:
             logger.exception("Error getting failed SSM commands")
-            raise RuntimeError("Unable to fullfil request") from error  
+            raise RuntimeError(f"Unable to fullfil request error encountered as : {error}") from error  
         except botocore.exceptions.ParamValidationError as error:
             raise ValueError('The parameters you provided are incorrect: {}'.format(error))
 
@@ -82,7 +82,7 @@ def process_ssm_run_command(metric_name, dimensions, region, account_id, namespa
             response_timed_out = {'Commands': commands_list}             
         except botocore.exceptions.ClientError as error:
             logger.exception("Error getting timed out SSM commands")
-            raise RuntimeError("Unable to fullfil request") from error  
+            raise RuntimeError(f"Unable to fullfil request error encountered as : {error}") from error  
         except botocore.exceptions.ParamValidationError as error:
             raise ValueError('The parameters you provided are incorrect: {}'.format(error)) 
 

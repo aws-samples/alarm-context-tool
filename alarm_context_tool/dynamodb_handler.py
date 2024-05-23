@@ -106,7 +106,7 @@ def process_dynamodb(dimensions, region, account_id, namespace, change_time, ann
                 response = ddb.describe_table(TableName=id) 
             except botocore.exceptions.ClientError as error:
                 logger.exception("Error describing DynamoDB table")
-                raise RuntimeError("Unable to fullfil request") from error  
+                raise RuntimeError(f"Unable to fullfil request error encountered as : {error}") from error  
             except botocore.exceptions.ParamValidationError as error:
                 raise ValueError('The parameters you provided are incorrect: {}'.format(error))
                             
@@ -118,7 +118,7 @@ def process_dynamodb(dimensions, region, account_id, namespace, change_time, ann
                 response = ddb.list_tags_of_resource(ResourceArn=response['Table']['TableArn']) 
             except botocore.exceptions.ClientError as error:
                 logger.exception("Error listing DynamoDB tags")
-                raise RuntimeError("Unable to fullfil request") from error  
+                raise RuntimeError(f"Unable to fullfil request error encountered as : {error}") from error  
             except botocore.exceptions.ParamValidationError as error:
                 raise ValueError('The parameters you provided are incorrect: {}'.format(error))            
             logger.info("DynamoDB Tags" , extra=response)

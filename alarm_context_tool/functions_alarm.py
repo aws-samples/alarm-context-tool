@@ -35,7 +35,7 @@ def get_alarm_history(region, alarm_name):
         response = {'AlarmHistoryItems': alarm_history_items}        
     except botocore.exceptions.ClientError as error:
         logger.exception("Error getting alarm history data")
-        raise RuntimeError("Unable to fullfil request") from error  
+        raise RuntimeError(f"Unable to fullfil request error encountered as : {error}") from error  
     except botocore.exceptions.ParamValidationError as error:
         raise ValueError('The parameters you provided are incorrect: {}'.format(error))      
     logger.info("Alarm History" , extra=response)

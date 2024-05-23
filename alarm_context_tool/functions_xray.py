@@ -35,7 +35,7 @@ def process_traces(filter_expression, region, trace_start_time, trace_end_time):
         )       
     except botocore.exceptions.ClientError as error:
         logger.exception("Error getting trace summaries")
-        raise RuntimeError("Unable to fullfil request") from error  
+        raise RuntimeError(f"Unable to fullfil request error encountered as : {error}") from error  
     except botocore.exceptions.ParamValidationError as error:
         raise ValueError('The parameters you provided are incorrect: {}'.format(error))
 
@@ -100,7 +100,7 @@ def process_traces(filter_expression, region, trace_start_time, trace_end_time):
             response = xray.batch_get_traces(TraceIds=[trace_id])
         except botocore.exceptions.ClientError as error:
             logger.exception("Error retrieving trace")
-            raise RuntimeError("Unable to fullfil request") from error  
+            raise RuntimeError(f"Unable to fullfil request error encountered as : {error}") from error  
         except botocore.exceptions.ParamValidationError as error:
             raise ValueError('The parameters you provided are incorrect: {}'.format(error))            
         

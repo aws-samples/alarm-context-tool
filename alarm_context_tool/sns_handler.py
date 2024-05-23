@@ -101,7 +101,7 @@ def process_sns_topic(dimensions, region, account_id, namespace, change_time, an
                 response = sns.get_topic_attributes(TopicArn=topic_arn)   
             except botocore.exceptions.ClientError as error:
                 logger.exception("Error getting topic attributes")
-                raise RuntimeError("Unable to fullfil request") from error  
+                raise RuntimeError(f"Unable to fullfil request error encountered as : {error}") from error  
             except botocore.exceptions.ParamValidationError as error:
                 raise ValueError('The parameters you provided are incorrect: {}'.format(error))
                           

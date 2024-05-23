@@ -123,7 +123,7 @@ def generate_metric_widget(metrics, annotation_time, start_time, end_time, regio
             response = cloudwatch.get_metric_widget_image(MetricWidget=json.dumps(metrics))
         except botocore.exceptions.ClientError as error:
             logger.exception("Error getting metric widget image")
-            raise RuntimeError("Unable to fullfil request") from error  
+            raise RuntimeError(f"Unable to fullfil request error encountered as : {error}") from error  
         except botocore.exceptions.ParamValidationError as error:
             raise ValueError('The parameters you provided are incorrect: {}'.format(error))
         
@@ -223,7 +223,7 @@ def generate_main_metric_widget(metrics_array, annotation_time, region, start_ti
         response = cloudwatch.get_metric_widget_image(MetricWidget=json.dumps(widget_config))
     except botocore.exceptions.ClientError as error:
         logger.exception("Error getting metric widget image")
-        raise RuntimeError("Unable to fullfil request") from error  
+        raise RuntimeError(f"Unable to fullfil request error encountered as : {error}") from error  
     except botocore.exceptions.ParamValidationError as error:
         raise ValueError('The parameters you provided are incorrect: {}'.format(error))  
       
@@ -329,7 +329,7 @@ def get_metrics_from_dashboard_metrics(dashboard_metrics, change_time, end, regi
             response = {'MetricDataResults': metric_data_results}              
         except botocore.exceptions.ClientError as error:
             logger.exception("Error getting metric data")
-            raise RuntimeError("Unable to fullfil request") from error  
+            raise RuntimeError(f"Unable to fullfil request error encountered as : {error}") from error  
         except botocore.exceptions.ParamValidationError as error:
             raise ValueError('The parameters you provided are incorrect: {}'.format(error))      
 

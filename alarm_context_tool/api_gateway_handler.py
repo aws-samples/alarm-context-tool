@@ -205,7 +205,7 @@ def process_api_gateway(dimensions, region, account_id, namespace, change_time, 
                 response = {'items': apis_list}
             except botocore.exceptions.ClientError as error:
                 logger.exception("Error getting rest apis")
-                raise RuntimeError("Unable to fullfil request") from error  
+                raise RuntimeError(f"Unable to fullfil request error encountered as : {error}") from error  
             except botocore.exceptions.ParamValidationError as error:
                 raise ValueError('The parameters you provided are incorrect: {}'.format(error))
             
@@ -216,7 +216,7 @@ def process_api_gateway(dimensions, region, account_id, namespace, change_time, 
                 response = api_gateway.get_rest_api(restApiId=api_id)
             except botocore.exceptions.ClientError as error:
                 logger.exception("Error getting rest api")
-                raise RuntimeError("Unable to fullfil request") from error  
+                raise RuntimeError(f"Unable to fullfil request error encountered as : {error}") from error  
             except botocore.exceptions.ParamValidationError as error:
                 raise ValueError('The parameters you provided are incorrect: {}'.format(error))
             tags = response.get('tags', {})
@@ -228,7 +228,7 @@ def process_api_gateway(dimensions, region, account_id, namespace, change_time, 
                     response = api_gateway.get_stage(restApiId=api_id, stageName=api_stage)
                 except botocore.exceptions.ClientError as error:
                     logger.exception("Error getting stage")
-                    raise RuntimeError("Unable to fullfil request") from error  
+                    raise RuntimeError(f"Unable to fullfil request error encountered as : {error}") from error  
                 except botocore.exceptions.ParamValidationError as error:
                     raise ValueError('The parameters you provided are incorrect: {}'.format(error))
                 tags = response.get('tags', {})

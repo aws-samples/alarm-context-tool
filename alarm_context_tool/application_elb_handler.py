@@ -358,7 +358,7 @@ def process_application_elb(dimensions, region, account_id, namespace, change_ti
                 response = elbv2.describe_load_balancers(Names=[load_balancer_name])
             except botocore.exceptions.ClientError as error:
                 logger.exception("Error getting Load Balancer")
-                raise RuntimeError("Unable to fullfil request") from error  
+                raise RuntimeError(f"Unable to fullfil request error encountered as : {error}") from error  
             except botocore.exceptions.ParamValidationError as error:
                 raise ValueError('The parameters you provided are incorrect: {}'.format(error))        
             resource_information += get_html_table("ELB: " +load_balancer_name, response['LoadBalancers'][0])  
@@ -372,7 +372,7 @@ def process_application_elb(dimensions, region, account_id, namespace, change_ti
                 response = elbv2.describe_target_groups(Names=[target_group_name])
             except botocore.exceptions.ClientError as error:
                 logger.exception("Error getting Target Group")
-                raise RuntimeError("Unable to fullfil request") from error  
+                raise RuntimeError(f"Unable to fullfil request error encountered as : {error}") from error  
             except botocore.exceptions.ParamValidationError as error:
                 raise ValueError('The parameters you provided are incorrect: {}'.format(error))        
             resource_information += get_html_table("ELB: " +target_group_name, response['TargetGroups'][0]) 
@@ -385,7 +385,7 @@ def process_application_elb(dimensions, region, account_id, namespace, change_ti
             response = elbv2.describe_tags(ResourceArns=resource_arns) 
         except botocore.exceptions.ClientError as error:
             logger.exception("Error describing tags")
-            raise RuntimeError("Unable to fullfil request") from error  
+            raise RuntimeError(f"Unable to fullfil request error encountered as : {error}") from error  
         except botocore.exceptions.ParamValidationError as error:
             raise ValueError('The parameters you provided are incorrect: {}'.format(error))            
         logger.info("ELB Tags" , extra=response)

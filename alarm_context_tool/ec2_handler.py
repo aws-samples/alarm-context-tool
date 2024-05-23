@@ -108,7 +108,7 @@ def process_ec2(metric_name, dimensions, region, account_id, namespace, change_t
                 response = ec2.describe_instances(InstanceIds=[instance_id])   
             except botocore.exceptions.ClientError as error:
                 logger.exception("Error describing EC2 Instance")
-                raise RuntimeError("Unable to fullfil request") from error  
+                raise RuntimeError(f"Unable to fullfil request error encountered as : {error}") from error  
             except botocore.exceptions.ParamValidationError as error:
                 raise ValueError('The parameters you provided are incorrect: {}'.format(error))            
                            
@@ -127,7 +127,7 @@ def process_ec2(metric_name, dimensions, region, account_id, namespace, change_t
                 response = ssm.describe_instance_information(InstanceInformationFilterList=[{'key': 'InstanceIds', 'valueSet': [instance_id]},])    
             except botocore.exceptions.ClientError as error:
                 logger.exception("Error describing EC2 Instance Information from SSM")
-                raise RuntimeError("Unable to fullfil request") from error  
+                raise RuntimeError(f"Unable to fullfil request error encountered as : {error}") from error  
             except botocore.exceptions.ParamValidationError as error:
                 raise ValueError('The parameters you provided are incorrect: {}'.format(error)) 
             logger.info("SSM Instance Information" , extra=response)            
@@ -161,7 +161,7 @@ def process_ec2(metric_name, dimensions, region, account_id, namespace, change_t
                 response = autoscaling.describe_auto_scaling_groups(AutoScalingGroupNames=[autoscaling_group_name]) 
             except botocore.exceptions.ClientError as error:
                 logger.exception("Error describing AutoScalingGroup")
-                raise RuntimeError("Unable to fullfil request") from error  
+                raise RuntimeError(f"Unable to fullfil request error encountered as : {error}") from error  
             except botocore.exceptions.ParamValidationError as error:
                 raise ValueError('The parameters you provided are incorrect: {}'.format(error))             
             
@@ -375,7 +375,7 @@ def process_ec2(metric_name, dimensions, region, account_id, namespace, change_t
                 )  
             except botocore.exceptions.ClientError as error:
                 logger.exception("Error describing AMIs")
-                raise RuntimeError("Unable to fullfil request") from error  
+                raise RuntimeError(f"Unable to fullfil request error encountered as : {error}") from error  
             except botocore.exceptions.ParamValidationError as error:
                 raise ValueError('The parameters you provided are incorrect: {}'.format(error))            
                            

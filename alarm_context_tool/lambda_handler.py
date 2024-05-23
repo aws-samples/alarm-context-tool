@@ -36,7 +36,7 @@ def process_lambda(metric_name, dimensions, region, account_id, namespace, chang
                     response = lambda_client.get_function(FunctionName=id)
                 except botocore.exceptions.ClientError as error:
                     logger.exception("Error getting Lambda Function")
-                    raise RuntimeError("Unable to fullfil request") from error  
+                    raise RuntimeError(f"Unable to fullfil request error encountered as : {error}") from error  
                 except botocore.exceptions.ParamValidationError as error:
                     raise ValueError('The parameters you provided are incorrect: {}'.format(error))             
                 

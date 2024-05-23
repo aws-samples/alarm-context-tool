@@ -55,7 +55,7 @@ def describe_events(region):
             return {}
         else:
             logger.exception("Error describing health Events")
-            raise RuntimeError("Unable to fullfil request") from error  
+            raise RuntimeError(f"Unable to fullfil request error encountered as : {error}") from error
     except botocore.exceptions.ParamValidationError as error:
         raise ValueError('The parameters you provided are incorrect: {}'.format(error))
     else:

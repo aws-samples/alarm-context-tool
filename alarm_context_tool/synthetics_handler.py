@@ -138,7 +138,7 @@ def process_synthetics(dimensions, region, account_id, namespace, change_time, a
                 response = synthetics.describe_canaries(Names=[id])
             except botocore.exceptions.ClientError as error:
                 logger.exception("Error describing canaries")
-                raise RuntimeError("Unable to fullfil request") from error  
+                raise RuntimeError(f"Unable to fullfil request error encountered as : {error}") from error  
             except botocore.exceptions.ParamValidationError as error:
                 raise ValueError('The parameters you provided are incorrect: {}'.format(error))
             
@@ -168,7 +168,7 @@ def process_synthetics(dimensions, region, account_id, namespace, change_time, a
                 ) 
             except botocore.exceptions.ClientError as error:
                 logger.exception("Error getting canary runs")
-                raise RuntimeError("Unable to fullfil request") from error  
+                raise RuntimeError(f"Unable to fullfil request error encountered as : {error}") from error  
             except botocore.exceptions.ParamValidationError as error:
                 raise ValueError('The parameters you provided are incorrect: {}'.format(error))            
    

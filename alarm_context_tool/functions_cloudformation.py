@@ -159,7 +159,7 @@ def get_cloudformation_template(tags, region, trace_summary, max_length=100):
             )
         except botocore.exceptions.ClientError as error:
             logger.exception("Error getting CloudFormation template")
-            raise RuntimeError("Unable to fullfil request") from error
+            raise RuntimeError(f"Unable to fullfil request error encountered as : {error}") from error
         except botocore.exceptions.ParamValidationError as error:
             raise ValueError('The parameters you provided are incorrect: {}'.format(error))
         

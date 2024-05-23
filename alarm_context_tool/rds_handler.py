@@ -23,7 +23,7 @@ def describe_db_instances(filters):
       )   
   except botocore.exceptions.ClientError as error:
       logger.exception("Error describing DB Instances")
-      raise RuntimeError("Unable to fullfil request") from error    
+      raise RuntimeError(f"Unable to fullfil request error encountered as : {error}") from error    
   except botocore.exceptions.ParamValidationError as error:  
       raise ValueError('The parameters you provided are incorrect: {}'
                        .format(error))
@@ -122,7 +122,7 @@ def get_pi_metrics(db_resource_ids, region):
             )  
         except botocore.exceptions.ClientError as error:
             logger.exception("Error listing available resource metrics")
-            raise RuntimeError("Unable to fullfil request") from error  
+            raise RuntimeError(f"Unable to fullfil request error encountered as : {error}") from error  
         except botocore.exceptions.ParamValidationError as error:
             raise ValueError('The parameters you provided are incorrect: {}'.format(error)) 
         for metric_detail in response['Metrics']:
@@ -343,7 +343,7 @@ def process_rds(metric_name, dimensions, region, account_id, namespace, change_t
                 response = rds.describe_db_clusters(DBClusterIdentifier=db_cluster_identifier)   
             except botocore.exceptions.ClientError as error:
                 logger.exception("Error describing RDS Clusters")
-                raise RuntimeError("Unable to fullfil request") from error  
+                raise RuntimeError(f"Unable to fullfil request error encountered as : {error}") from error  
             except botocore.exceptions.ParamValidationError as error:
                 raise ValueError('The parameters you provided are incorrect: {}'.format(error)) 
             logger.info("Describe Cluster", extra=response)

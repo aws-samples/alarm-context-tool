@@ -117,7 +117,7 @@ def send_email(sender, recipient, subject, body_text, body_html, attachments=Non
         print("Email Sent", response['MessageId'])
     except botocore.exceptions.ClientError as error:
         logger.exception("Error Sending Email")
-        raise RuntimeError("Unable to fullfil request") from error
+        raise RuntimeError(f"Unable to fullfil request error encountered as : {error}") from error
     except botocore.exceptions.ParamValidationError as error:
         raise ValueError('The parameters you provided are incorrect: {}'.format(error))        
 
