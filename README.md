@@ -55,10 +55,29 @@ The Alarm Context Tool (ACT) enhances AWS CloudWatch Alarms by providing additio
     ```
 
 2. Subsequently, you can build, deploy and test using the following command:
-    The test-event must be shared.
+    The test-event must be shared. See Testing
     ```sh
-    sam build; sam deploy --no-confirm-changeset; sam remote invoke --stack-name alarm-context --test-event-name test-event
+    sam build; sam deploy --no-confirm-changeset; sam remote invoke --stack-name alarm-context-tool --test-event-name test-event
     ```
+
+## Testing
+
+1. **Trigger an Alarm**:
+  Manually trigger an alarm using the following command:
+    ```sh
+    aws cloudwatch set-alarm-state --state-value ALARM --state-reason "Testing" --alarm-name "<alarm_name>"
+    ```
+
+Mention logging of test cases in code
+
+1. Open the CloudWatch console at [https://console.aws.amazon.com/cloudwatch/](https://console.aws.amazon.com/cloudwatch/)
+1. In the navigation pane, choose Logs, and then choose Logs Insights.
+1. In the Select log group(s) drop down, choose /aws/lambda/alarm-context-tool-AlarmContextFunction-xxxxxxxxxxxx
+1. Enter the following query:
+   ```sql
+  fields @message
+  | filter message  = "test_case" 
+  ```
 
 ## Usage
 Once deployed, the Lambda function will be triggered by CloudWatch Alarms. The function will enhance the alarm message with additional context such as related metrics, logs, and traces. It uses Amazon Bedrock to analyze the gathered data and generate actionable insights.
@@ -109,11 +128,7 @@ To create a new handler for a different AWS service, follow these steps:
 5. **Add necessary permissions**:
     Ensure that your new handler has the required permissions by updating the `template.yaml` file as shown above.
 
-1. **Testing**:
-  Manually trigger an alarm using the following command:
-    ```sh
-    aws cloudwatch set-alarm-state --state-value ALARM --state-reason "Testing" --alarm-name "<alarm_name>"
-    ```
+
 
 ## Environment Variables
 The following environment variables can be configured for the Lambda function:
