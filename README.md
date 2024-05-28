@@ -11,7 +11,7 @@ The Alarm Context Tool (ACT) enhances AWS CloudWatch Alarms by providing additio
 - [Creating a New Handler](#creating-a-new-handler)
 - [Testing](#testing)
 - [Environment Variables](#environment-variables)
-- [Available Functions](#Some-of-the-available-functions)
+- [Available Functions](#some-of-the-available-functions)
 - [Security](#security)
 - [License](#license)
 
