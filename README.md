@@ -140,15 +140,15 @@ To create a new handler for a different AWS service, follow these steps:
     ```
 
 1. **Use the test cases generated in the logs**:
-The main Lambda function generates a test case that can be used in the [Lambda console](https://console.aws.amazon.com/lambda/). See Testing Lambda functions in the console](https://docs.aws.amazon.com/lambda/latest/dg/testing-functions.html?icmpid=docs_lambda_help) or by using ```sam remote invoke```.
+The main Lambda function generates a test case that can be used in the [Lambda console](https://console.aws.amazon.com/lambda/). See [Testing Lambda functions in the console](https://docs.aws.amazon.com/lambda/latest/dg/testing-functions.html?icmpid=docs_lambda_help) or by using ```sam remote invoke```.
   1. Open the [CloudWatch console](https://console.aws.amazon.com/cloudwatch/)
   1. In the navigation pane, choose **Logs**, and then choose **Logs Insights**.
   1. In the Select log group(s) drop down, choose **/aws/lambda/alarm-context-tool-AlarmContextFunction-xxxxxxxxxxxx**
   1. Enter the following query, replacing <alarm_name> with the name of your alarm:
-    ```sql
-    fields @timestamp, @message, @logStream, @log
-    | filter message  = "test_case" AND Records.0.Sns.Message like /<alarm_name>/
-    ```
+      ```
+      fields @timestamp, @message, @logStream, @log
+      | filter message  = "test_case" AND Records.0.Sns.Message like /<alarm_name>/
+      ```
   1. Choose **Run query**
   1. Expand a log entry and copy the entire **@message** field.
   1. You can then use this to test your Lambda function on demand.
