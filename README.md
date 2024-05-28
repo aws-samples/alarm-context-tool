@@ -9,9 +9,11 @@ The Alarm Context Tool (ACT) enhances AWS CloudWatch Alarms by providing additio
 - [Deployment](#deployment)
 - [Usage](#usage)
 - [Creating a New Handler](#creating-a-new-handler)
-- [Creating a New Handler](#testing)
+- [Testing](#testing)
 - [Environment Variables](#environment-variables)
-- [Available Functions](#available-functions)
+- [Available Functions](#Some-of-the-available-functions)
+- [Security](#security)
+- [License](#license)
 
 ## Prerequisites
 1. [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) configured with appropriate permissions.
@@ -193,6 +195,38 @@ Resources:
           SENDER: Name <alias@domain.com>
           USE_BEDROCK: "True"   
 ```
+## Some of the available functions
+
+### Logs Functions (`functions_logs`)
+
+- **get_log_insights_link(log_group_name, start_time, end_time, query)**
+  - Generates a CloudWatch Logs Insights query link.
+  - **Parameters:**
+    - `log_group_name` (str): The name of the log group.
+    - `start_time` (str): The start time for the query.
+    - `end_time` (str): The end time for the query.
+    - `query` (str): The Logs Insights query.
+
+### Metrics Functions (`functions_metrics`)
+
+- **build_dashboard(dashboard_metrics, annotation_time, start, end, region)**
+  - Builds a dashboard with the specified metrics.
+  - **Parameters:**
+    - `dashboard_metrics` (list): The list of metrics for the dashboard.
+    - `annotation_time` (str): The annotation time for the dashboard.
+    - `start` (str): The start time for the dashboard.
+    - `end` (str): The end time for the dashboard.
+    - `region` (str): The AWS region.
+
+### X-Ray Functions (`functions_xray`)
+
+- **process_traces(trace_ids, start_time, end_time, region)**
+  - Processes X-Ray traces and retrieves trace summaries and details.
+  - **Parameters:**
+    - `trace_ids` (list): The list of trace IDs to process.
+    - `start_time` (str): The start time for the trace processing.
+    - `end_time` (str): The end time for the trace processing.
+    - `region` (str): The AWS region.
 
 ## Security
 
@@ -206,4 +240,3 @@ This library is licensed under the MIT-0 License. See the LICENSE file.
 - Alarms created with Metric Insights queries will not have a namespace or dimensions
 - Add Log Insights Queries - Done
 - Look at each handler to see where Log Insights Queries can be used
-- Use Log Patterns in Log Insights Queries instead of last 10 of events
