@@ -246,3 +246,4 @@ $RECYCLE.BIN/
 .aws-sam/*
 
 # End of https://www.gitignore.io/api/osx,linux,python,windows,pycharm,visualstudiocode
+.aws-sam/build.toml
