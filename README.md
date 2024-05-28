@@ -9,6 +9,7 @@ The Alarm Context Tool (ACT) enhances AWS CloudWatch Alarms by providing additio
 - [Deployment](#deployment)
 - [Usage](#usage)
 - [Creating a New Handler](#creating-a-new-handler)
+- [Creating a New Handler](#testing)
 - [Environment Variables](#environment-variables)
 - [Available Functions](#available-functions)
 
@@ -51,6 +52,21 @@ The Alarm Context Tool (ACT) enhances AWS CloudWatch Alarms by providing additio
     ```yaml
     - !Sub arn:aws:lambda:${AWS::Region}:580247275435:layer:LambdaInsightsExtension:49
     ```
+
+1. Edit the remplate.yaml file with the recipient email address and sender address.
+
+  ```yaml
+  Resources:
+    AlarmContextFunction:
+      Type: AWS::Serverless::Function
+        Handler: lambda_function.alarm_handler
+        Runtime: python3.12
+        Environment:
+          Variables:
+            RECIPIENT: alias@domain.com
+            SENDER: Name <alias@domain.com>
+  ```
+
 ## Deployment
 1. Use a guided deployment to start with:
     ```sh
@@ -61,30 +77,11 @@ The Alarm Context Tool (ACT) enhances AWS CloudWatch Alarms by providing additio
 2. Subsequently, you can build, deploy and test using the following command:
     The test-event must be shared. See Testing
     ```sh
-    sam build; sam deploy --no-confirm-changeset; sam remote invoke --stack-name alarm-context-tool --test-event-name test-event
+    sam build; sam deploy --no-confirm-changeset; sam remote invoke --stack-name alarm-context-tool --region <aws-region> --test-event-name <test-event>
     ```
-
-## Testing
-
-1. **Trigger an Alarm**:
-  Manually trigger an alarm using the following command:
-    ```sh
-    aws cloudwatch set-alarm-state --state-value ALARM --state-reason "Testing" --alarm-name "<alarm_name>"
-    ```
-
-Mention logging of test cases in code
-
-1. Open the CloudWatch console at [https://console.aws.amazon.com/cloudwatch/](https://console.aws.amazon.com/cloudwatch/)
-1. In the navigation pane, choose Logs, and then choose Logs Insights.
-1. In the Select log group(s) drop down, choose /aws/lambda/alarm-context-tool-AlarmContextFunction-xxxxxxxxxxxx
-1. Enter the following query:
-   ```sql
-  fields @message
-  | filter message  = "test_case" 
-  ```
 
 ## Usage
-Once deployed, the Lambda function will be triggered by CloudWatch Alarms. The function will enhance the alarm message with additional context such as related metrics, logs, and traces. It uses Amazon Bedrock to analyze the gathered data and generate actionable insights.
+Once deployed, the Lambda function will be triggered by SNS topics subscribed to CloudWatch Alarms. The function will enhance the alarm message with additional context such as related metrics, logs, and traces. It uses Amazon Bedrock to analyze the gathered data and generate actionable insights.
 
 ## Creating a New Handler
 To create a new handler for a different AWS service, follow these steps:
@@ -92,7 +89,7 @@ To create a new handler for a different AWS service, follow these steps:
 1. **Create a new handler file**:
     Create a new Python file in the `handlers` directory. For example, `new_service_handler.py`.
 
-2. **Define the handler function**:
+1. **Define the handler function**:
     Implement the handler function similar to existing handlers. Here's a template:
 
     ```python
@@ -109,10 +106,10 @@ To create a new handler for a different AWS service, follow these steps:
         pass
     ```
 
-3. **Add the handler to the Lambda function**:
+1. **Add the handler to the Lambda function**:
     Update `lambda_function.py` to import and call your new handler based on the trigger.
 
-4. **Update the template**:
+1. **Update the template**:
     Modify `template.yaml` to include your new handler and update necessary permissions.
 
     ```yaml
@@ -129,10 +126,30 @@ To create a new handler for a different AWS service, follow these steps:
                   Resource: "*"
     ```
 
-5. **Add necessary permissions**:
+1. **Add necessary permissions**:
     Ensure that your new handler has the required permissions by updating the `template.yaml` file as shown above.
 
+## Testing
 
+1. **Trigger an Alarm**:
+  Manually trigger an alarm using the following command, replacing <alarm_name> with the name of your alarm:
+    ```sh
+    aws cloudwatch set-alarm-state --state-value ALARM --state-reason "Testing" --alarm-name "<alarm_name>"
+    ```
+
+1. **Use the test cases generated in the logs**:
+The main Lambda function generates a test case that can be used in the [Lambda console](https://console.aws.amazon.com/lambda/). See Testing Lambda functions in the console](https://docs.aws.amazon.com/lambda/latest/dg/testing-functions.html?icmpid=docs_lambda_help) or by using ```sam remote invoke```.
+  1. Open the [CloudWatch console](https://console.aws.amazon.com/cloudwatch/)
+  1. In the navigation pane, choose **Logs**, and then choose **Logs Insights**.
+  1. In the Select log group(s) drop down, choose **/aws/lambda/alarm-context-tool-AlarmContextFunction-xxxxxxxxxxxx**
+  1. Enter the following query, replacing <alarm_name> with the name of your alarm:
+    ```sql
+    fields @timestamp, @message, @logStream, @log
+    | filter message  = "test_case" AND Records.0.Sns.Message like /<alarm_name>/
+    ```
+  1. Choose **Run query**
+  1. Expand a log entry and copy the entire **@message** field.
+  1. You can then use this to test your Lambda function on demand.
 
 ## Environment Variables
 The following environment variables can be configured for the Lambda function:
@@ -186,9 +203,7 @@ See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more inform
 This library is licensed under the MIT-0 License. See the LICENSE file.
 
 ## TO DO
-- Update test case function - DONE, COULD IMPROVE?
 - Alarms created with Metric Insights queries will not have a namespace or dimensions
 - Add Log Insights Queries - Done
 - Look at each handler to see where Log Insights Queries can be used
 - Use Log Patterns in Log Insights Queries instead of last 10 of events
-- Remove IDS from TD get_html_table and clean up HTML

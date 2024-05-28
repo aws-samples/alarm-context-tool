@@ -39,11 +39,6 @@ def process_traces(filter_expression, region, trace_start_time, trace_end_time):
     except botocore.exceptions.ParamValidationError as error:
         raise ValueError('The parameters you provided are incorrect: {}'.format(error))
 
-    # Log the trace ID
-    for trace_summary in response.get('TraceSummaries', []):
-        logger.info("Trace ID", trace_summary_id=trace_summary.get('Id'))
-
-    # Log the response as a JSON string on one line
     MAX_TRACE_SUMMARIES = 3
     limited_trace_summaries = response.get('TraceSummaries', [])[:MAX_TRACE_SUMMARIES]
 

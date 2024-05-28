@@ -66,7 +66,7 @@ Resources:
         MaximumRetryAttempts: 2
       Layers:
         - !Sub arn:aws:lambda:${AWS::Region}:580247275435:layer:LambdaInsightsExtension:49
-        - !Sub arn:aws:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV2:7
+        - !Sub arn:aws:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV2:71
         - !Ref DependenciesLayer
       PackageType: Zip
       Policies:
