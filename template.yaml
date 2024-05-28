@@ -65,8 +65,8 @@ Resources:
         MaximumEventAgeInSeconds: 21600
         MaximumRetryAttempts: 2
       Layers:
-        - arn:aws:lambda:us-east-2:580247275435:layer:LambdaInsightsExtension:49
-        - arn:aws:lambda:us-east-2:017000801446:layer:AWSLambdaPowertoolsPythonV2:67
+        - !Sub "arn:aws:lambda:${AWS::Region}:580247275435:layer:LambdaInsightsExtension:49"
+        - !Sub "arn:aws:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV2:67"
         - !Ref DependenciesLayer
       PackageType: Zip
       Policies:
