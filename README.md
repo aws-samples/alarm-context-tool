@@ -236,9 +236,3 @@ See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more inform
 
 This library is licensed under the MIT-0 License. See the LICENSE file.
 
-## TO DO
-- Alarms created with Metric Insights queries will not have a namespace or dimensions
-- Add Log Insights Queries - Done
-- Look at each handler to see where Log Insights Queries can be used
-- Remove EMAIL addresses from template.yaml
-- Look at agents for Bedrock
