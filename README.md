@@ -71,7 +71,7 @@ The Alarm Context Tool (ACT) enhances AWS CloudWatch Alarms by providing additio
 
 1. Update additional [Environment Variables](#environment-variables) if required
 
-1. Update your SNS Topics that receive notifications from CloudWatch alarms: 
+1. Update your SNS Topics that receive notifications from CloudWatch alarms:
 	- Protocol: AWS Lambda
 	- Endpoint: ARN of your Lambda function
 
