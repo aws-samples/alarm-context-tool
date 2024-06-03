@@ -46,12 +46,9 @@ The Alarm Context Tool (ACT) enhances AWS CloudWatch Alarms by providing additio
 
 1. Install dependencies if you plan to use your IDE to detect problems in the code:
     ```sh
-    cd dependencies_layer 
-    pip install -r requirements.txt
+    pip install -r ./dependencies_layer/requirements.txt
     pip install aws_lambda_powertools 
     ```
-
-1. Update [Environment Variables](#environment-variables)
 
 1. For some regions, you may need to change the layer version for Lambda Insights after the colon in template.yaml. See https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Lambda-Insights-extension-versionsx86-64.html.
     ```yaml
@@ -71,6 +68,8 @@ The Alarm Context Tool (ACT) enhances AWS CloudWatch Alarms by providing additio
             RECIPIENT: alias@domain.com
             SENDER: Name <alias@domain.com>
   ```
+
+1. Update additional [Environment Variables](#environment-variables) if required
 
 ## Deployment
 1. Use a guided deployment to start with:
