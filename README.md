@@ -55,7 +55,7 @@ The Alarm Context Tool (ACT) enhances AWS CloudWatch Alarms by providing additio
     - !Sub arn:aws:lambda:${AWS::Region}:580247275435:layer:LambdaInsightsExtension:49
     ```
 
-1. Edit the remplate.yaml file with the recipient email address and sender address.
+1. Edit the template.yaml file with the recipient email address and sender address.
 
   ```yaml
   Resources:
